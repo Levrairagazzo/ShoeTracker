@@ -1,3 +1,5 @@
+
+
 # ShoeTracker
 
 ShoeTracker is a small web app for runners to track mileage on their running shoes. You log your shoes and the runs you do in them, and the app tells you when a shoe has passed its retirement threshold.
@@ -48,7 +50,7 @@ The app is a classic two-tier web application: a single-page React frontend that
 - React 19 + TypeScript
 - Vite 8 as the build tool/dev server
 - oxlint for linting
-- Plain CSS (no UI framework)
+- Tailwind CSS v4 (via `@tailwindcss/vite`) for styling
 
 **Infrastructure**
 - Docker (separate `Dockerfile`s for the API and client)
