@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: ./src/ShoeTracker.Api
+    volumes:
+      - shoe-data:/data
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  shoe-data:
