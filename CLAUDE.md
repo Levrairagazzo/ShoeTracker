@@ -20,8 +20,9 @@ Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core min
 - Connection string / DB file path is configured in `appsettings.json` (`ConnectionStrings:ShoeTrackerContext`, SQLite file `shoetracker.db`). In Docker the SQLite file lives on a named volume (`shoe-data`) so data survives restarts.
 
 **Client** (`client/src/`):
-- Vite + React 19 + TypeScript SPA, styled with Tailwind CSS v4 (via `@tailwindcss/vite`).
-- `App.tsx` loads the shoe list on mount and renders `ShoeList`, `AddShoeForm`, and `LogRunForm` (`components/`).
+- Vite + React 19 + TypeScript SPA, styled with Tailwind CSS v4 (via `@tailwindcss/vite`, CSS-first config — design tokens are CSS custom properties in `index.css`, exposed to Tailwind via a `@theme inline` block so both dark mode and Tailwind utility classes read from the same source).
+- `App.tsx` loads the shoe list on mount, renders a header with "Add Shoe"/"Log Run" actions that open `Modal`-wrapped forms, and renders `ShoeGrid`.
+- `components/`: `ShoeGrid` (responsive card grid + empty state) renders `ShoeCard` per shoe. `ShoeCard` is a `<details>/<summary>` expand/collapse card showing the key stat + status pill always, with edit/delete-shoe actions and a lazily-loaded `RunHistoryList` (per-run inline edit/delete) in the expanded state. `ShoeForm` is dual-purpose — pass a `shoe` prop to edit, omit it to create. `Modal` wraps the native `<dialog>` element (used for add/edit shoe). `icons.tsx` holds small inline SVG icon components — no icon library dependency.
 - All server communication goes through `api/shoeTrackerClient.ts`, a small typed fetch wrapper that calls a relative `/api` base path and surfaces validation errors via `ApiError`, which wraps the API's `ProblemDetails` response. Add new API calls here rather than calling `fetch` directly from components.
 
 ### API endpoints
@@ -31,7 +32,14 @@ Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core min
 | `GET` | `/shoes` | List all shoes with computed total distance and retirement status |
 | `GET` | `/shoes/{id}` | Get a single shoe |
 | `POST` | `/shoes` | Create a shoe |
+| `PUT` | `/shoes/{id}` | Update a shoe |
+| `DELETE` | `/shoes/{id}` | Delete a shoe (cascades to its runs) |
+| `GET` | `/shoes/{shoeId}/runs` | List a shoe's runs, most recent first |
 | `POST` | `/shoes/{shoeId}/runs` | Log a run against a shoe |
+| `PUT` | `/shoes/{shoeId}/runs/{id}` | Update a run |
+| `DELETE` | `/shoes/{shoeId}/runs/{id}` | Delete a run |
+
+Validation logic shared between create/update is factored into a private `Validate...` helper in each endpoint file — follow that pattern rather than duplicating the checks inline when adding new mutating endpoints.
 
 ## Commands
 
@@ -66,14 +74,31 @@ npm run build     # tsc -b && vite build
 npm run lint       # oxlint
 ```
 
+**Back up the live database** (from repo root, requires the app running via `docker compose`):
+```bash
+./scripts/backup-db.sh
+```
+
 **EF Core migrations** (from `src/ShoeTracker.Api/`) — `dotnet-ef` is a local tool pinned in `dotnet-tools.json`; run `dotnet tool restore` once if it's not on PATH:
 ```bash
 dotnet ef migrations add <Name>
 dotnet ef database update
 ```
 
+## Deployment & auth
+
+- The app has no application-level user accounts (single-user by design). The whole app — static SPA and `/api/*` proxy alike — is gated by HTTP Basic Auth enforced in `client/nginx.conf` (`auth_basic`), backed by a `secrets/.htpasswd` file that is git-ignored and never baked into the Docker image. It's mounted read-only into the `client` container via `docker-compose.yml`; the container refuses to start without it. Generate credentials with `htpasswd -c -B secrets/.htpasswd <username>` (see README's "Deploying" section).
+- TLS is expected to be terminated by the hosting platform (not nginx) — nginx only ever speaks plain HTTP.
+- `AllowedHosts` is wired as an environment variable override in `docker-compose.yml` (`ALLOWED_HOSTS`, defaulting to `*`) so the real deploy domain can be set via a `.env` file without a code change.
+- `appsettings.Production.json` quiets logging for `ASPNETCORE_ENVIRONMENT=Production`; note `dotnet run` applies `Properties/launchSettings.json`'s `ASPNETCORE_ENVIRONMENT=Development` regardless of shell env vars unless you pass `--no-launch-profile`.
+- `scripts/backup-db.sh` takes a manual point-in-time snapshot of the live SQLite volume via `sqlite3 .backup` (not a raw file copy — WAL-mode SQLite needs a real backup call, and the volume must be mounted read-write, not read-only, for that to work). No automated/scheduled backup exists yet.
+
+## Branches
+
+`prod` is the default branch (renamed from `main`) and tracks what's deployed. `dev` is for active feature work. When starting new feature work, branch from `dev`, not `prod`.
+
 ## Tech stack
 
 - Backend: .NET 10 / ASP.NET Core Minimal APIs, EF Core 10 with SQLite, xUnit
 - Frontend: React 19 + TypeScript, Vite 8, oxlint, Tailwind CSS v4
-- Infra: Docker (separate Dockerfiles for API and client), nginx reverse proxy, Docker Compose with a named volume for the SQLite database
+- Infra: Docker (separate Dockerfiles for API and client), nginx reverse proxy with HTTP Basic Auth, Docker Compose with a named volume for the SQLite database
