@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { ApiError, shoeTrackerClient } from '../api/shoeTrackerClient'
+import type { Shoe } from '../api/types'
 
-interface AddShoeFormProps {
+interface ShoeFormProps {
+  shoe?: Shoe
   onSuccess: () => void
   onCancel: () => void
 }
@@ -9,11 +11,11 @@ interface AddShoeFormProps {
 const inputClass =
   'rounded-lg border border-border bg-bg px-3 py-2 text-text-h outline-none focus:border-accent-border'
 
-export function AddShoeForm({ onSuccess, onCancel }: AddShoeFormProps) {
-  const [name, setName] = useState('')
-  const [brand, setBrand] = useState('')
-  const [purchaseDate, setPurchaseDate] = useState('')
-  const [thresholdKm, setThresholdKm] = useState('700')
+export function ShoeForm({ shoe, onSuccess, onCancel }: ShoeFormProps) {
+  const [name, setName] = useState(shoe?.name ?? '')
+  const [brand, setBrand] = useState(shoe?.brand ?? '')
+  const [purchaseDate, setPurchaseDate] = useState(shoe?.purchaseDate ?? '')
+  const [thresholdKm, setThresholdKm] = useState(String(shoe?.thresholdKm ?? 700))
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -23,23 +25,26 @@ export function AddShoeForm({ onSuccess, onCancel }: AddShoeFormProps) {
     setSubmitting(true)
 
     try {
-      await shoeTrackerClient.createShoe({
+      const body = {
         name,
         brand,
         purchaseDate,
         thresholdKm: thresholdKm ? Number(thresholdKm) : undefined,
-      })
-      setName('')
-      setBrand('')
-      setPurchaseDate('')
-      setThresholdKm('700')
+      }
+
+      if (shoe) {
+        await shoeTrackerClient.updateShoe(shoe.id, body)
+      } else {
+        await shoeTrackerClient.createShoe(body)
+      }
+
       onSuccess()
     } catch (err) {
       if (err instanceof ApiError) {
         const messages = err.problem ? Object.values(err.problem.errors).flat() : [err.message]
         setError(messages.join(' '))
       } else {
-        setError('Something went wrong adding the shoe.')
+        setError(`Something went wrong ${shoe ? 'updating' : 'adding'} the shoe.`)
       }
     } finally {
       setSubmitting(false)
@@ -100,7 +105,7 @@ export function AddShoeForm({ onSuccess, onCancel }: AddShoeFormProps) {
           disabled={submitting}
           className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? 'Adding…' : 'Add shoe'}
+          {submitting ? 'Saving…' : shoe ? 'Save changes' : 'Add shoe'}
         </button>
       </div>
     </form>

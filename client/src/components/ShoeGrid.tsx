@@ -5,9 +5,10 @@ import { ShoeCard } from './ShoeCard'
 interface ShoeGridProps {
   shoes: Shoe[]
   onAddShoe: () => void
+  onChanged: () => void
 }
 
-export function ShoeGrid({ shoes, onAddShoe }: ShoeGridProps) {
+export function ShoeGrid({ shoes, onAddShoe, onChanged }: ShoeGridProps) {
   if (shoes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
@@ -30,7 +31,7 @@ export function ShoeGrid({ shoes, onAddShoe }: ShoeGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
       {shoes.map((shoe) => (
-        <ShoeCard key={shoe.id} shoe={shoe} />
+        <ShoeCard key={shoe.id} shoe={shoe} onChanged={onChanged} />
       ))}
     </div>
   )

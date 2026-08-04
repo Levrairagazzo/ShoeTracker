@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AddShoeForm } from './components/AddShoeForm'
+import { ShoeForm } from './components/ShoeForm'
 import { LogRunForm } from './components/LogRunForm'
 import { Modal } from './components/Modal'
 import { ShoeGrid } from './components/ShoeGrid'
@@ -82,11 +82,11 @@ function App() {
       )}
 
       {!loading && !loadError && (
-        <ShoeGrid shoes={shoes} onAddShoe={() => setIsAddShoeOpen(true)} />
+        <ShoeGrid shoes={shoes} onAddShoe={() => setIsAddShoeOpen(true)} onChanged={loadShoes} />
       )}
 
       <Modal open={isAddShoeOpen} onClose={() => setIsAddShoeOpen(false)} title="Add a shoe">
-        <AddShoeForm
+        <ShoeForm
           onSuccess={() => {
             loadShoes()
             setIsAddShoeOpen(false)

@@ -39,8 +39,21 @@ export const shoeTrackerClient = {
   createShoe: (body: CreateShoeRequest) =>
     request<Shoe>('/shoes', { method: 'POST', body: JSON.stringify(body) }),
 
+  updateShoe: (id: number, body: CreateShoeRequest) =>
+    request<Shoe>(`/shoes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteShoe: (id: number) => request<void>(`/shoes/${id}`, { method: 'DELETE' }),
+
+  listRuns: (shoeId: number) => request<Run[]>(`/shoes/${shoeId}/runs`),
+
   logRun: (shoeId: number, body: CreateRunRequest) =>
     request<Run>(`/shoes/${shoeId}/runs`, { method: 'POST', body: JSON.stringify(body) }),
+
+  updateRun: (shoeId: number, id: number, body: CreateRunRequest) =>
+    request<Run>(`/shoes/${shoeId}/runs/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteRun: (shoeId: number, id: number) =>
+    request<void>(`/shoes/${shoeId}/runs/${id}`, { method: 'DELETE' }),
 }
 
 export { ApiError }

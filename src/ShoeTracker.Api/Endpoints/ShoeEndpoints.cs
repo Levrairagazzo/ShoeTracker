@@ -14,30 +14,9 @@ public static class ShoeEndpoints
 
         group.MapPost("/", async (CreateShoeRequest request, ShoeTrackerContext db) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Name))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["Name"] = ["Name is required."]
-                });
-            }
-
-            if (string.IsNullOrWhiteSpace(request.Brand))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["Brand"] = ["Brand is required."]
-                });
-            }
-
             var thresholdKm = request.ThresholdKm ?? 700;
-            if (thresholdKm <= 0)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["ThresholdKm"] = ["ThresholdKm must be greater than zero."]
-                });
-            }
+            var validation = ValidateShoe(request.Name, request.Brand, thresholdKm);
+            if (validation is not null) return validation;
 
             var shoe = new Shoe
             {
@@ -64,6 +43,65 @@ public static class ShoeEndpoints
             var shoe = await db.Shoes.Include(s => s.Runs).FirstOrDefaultAsync(s => s.Id == id);
             return shoe is null ? Results.NotFound() : Results.Ok(ToResponse(shoe));
         });
+
+        group.MapPut("/{id:int}", async (int id, CreateShoeRequest request, ShoeTrackerContext db) =>
+        {
+            var thresholdKm = request.ThresholdKm ?? 700;
+            var validation = ValidateShoe(request.Name, request.Brand, thresholdKm);
+            if (validation is not null) return validation;
+
+            var shoe = await db.Shoes.Include(s => s.Runs).FirstOrDefaultAsync(s => s.Id == id);
+            if (shoe is null) return Results.NotFound();
+
+            shoe.Name = request.Name;
+            shoe.Brand = request.Brand;
+            shoe.PurchaseDate = request.PurchaseDate;
+            shoe.ThresholdKm = thresholdKm;
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(ToResponse(shoe));
+        });
+
+        group.MapDelete("/{id:int}", async (int id, ShoeTrackerContext db) =>
+        {
+            var shoe = await db.Shoes.FindAsync(id);
+            if (shoe is null) return Results.NotFound();
+
+            db.Shoes.Remove(shoe);
+            await db.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+    }
+
+    private static IResult? ValidateShoe(string name, string brand, double thresholdKm)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["Name"] = ["Name is required."]
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(brand))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["Brand"] = ["Brand is required."]
+            });
+        }
+
+        if (thresholdKm <= 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["ThresholdKm"] = ["ThresholdKm must be greater than zero."]
+            });
+        }
+
+        return null;
     }
 
     private static ShoeResponse ToResponse(Shoe shoe) => new(
