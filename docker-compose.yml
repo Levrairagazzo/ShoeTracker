@@ -2,6 +2,8 @@ services:
   api:
     build:
       context: ./src/ShoeTracker.Api
+    environment:
+      - AllowedHosts=${ALLOWED_HOSTS:-*}
     volumes:
       - shoe-data:/data
     restart: unless-stopped
@@ -11,6 +13,8 @@ services:
       context: ./client
     ports:
       - "8080:80"
+    volumes:
+      - ./secrets/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       - api
     restart: unless-stopped

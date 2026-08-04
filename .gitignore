@@ -23,6 +23,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Secrets
+secrets/
+
+# Local database backups
+backups/
+
 # Editor / IDE
 .vscode/*
 !.vscode/extensions.json

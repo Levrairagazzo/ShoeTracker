@@ -88,3 +88,46 @@ npm run dev
 cd tests/ShoeTracker.Api.Tests
 dotnet test
 ```
+
+## Deploying
+
+The app has no user accounts — it's designed for a single person to run behind HTTP Basic Auth. Before deploying anywhere reachable from the internet:
+
+**1. Set a username and password.**
+
+```bash
+mkdir -p secrets
+htpasswd -c -B secrets/.htpasswd <your-username>
+```
+
+This creates `secrets/.htpasswd` (bcrypt-hashed, `.gitignore`d — never commit it) and `docker-compose.yml` mounts it into the `client` container at `/etc/nginx/.htpasswd`. nginx (`client/nginx.conf`) gates the whole app — both the static site and the `/api/*` proxy — behind it via `auth_basic`. If the file isn't present, the container refuses to start rather than serving unauthenticated.
+
+To add or change a user later: `htpasswd -B secrets/.htpasswd <username>` (drop `-c`, which would overwrite the file).
+
+**2. Put it behind HTTPS.**
+
+nginx here only speaks plain HTTP — it's meant to sit behind a host that terminates TLS for you (e.g. Fly.io's automatic HTTPS, or a Cloudflare Tunnel), not to manage certificates itself. Basic Auth credentials are only base64-encoded, not encrypted, so the app should never be exposed over plain HTTP once it's off `localhost`.
+
+**3. Set `AllowedHosts` once you have a real domain.**
+
+By default the API answers to any hostname (`AllowedHosts: "*"` in `appsettings.json`). Once you know the domain the app will actually live at, set it via an `ALLOWED_HOSTS` environment variable (e.g. in a `.env` file next to `docker-compose.yml`, which `docker compose` picks up automatically):
+
+```
+ALLOWED_HOSTS=yourdomain.example.com
+```
+
+Leaving it unset keeps today's behavior (`*`), so this is safe to skip until you've picked a host.
+
+**4. Production logging.**
+
+`appsettings.Production.json` quiets the logs down for a live deployment (it's layered on top of `appsettings.json` automatically whenever `ASPNETCORE_ENVIRONMENT=Production`, which is the default unless overridden) — nothing to configure here, just noting it exists.
+
+### Backing up the database
+
+All data lives in one SQLite file inside the `shoe-data` Docker volume — nothing backs it up automatically. To take a manual snapshot while the app is running:
+
+```bash
+./scripts/backup-db.sh
+```
+
+This writes a timestamped copy to `./backups/` (gitignored — these are your real running logs, never commit them). It's safe to run at any time; it takes a consistent snapshot via SQLite's own backup mechanism rather than copying the file directly, so it won't produce a corrupt copy even if the app is actively writing to it.
