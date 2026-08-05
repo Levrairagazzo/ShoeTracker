@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, prod, main]
+  pull_request:
+
+jobs:
+  api:
+    name: API build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore tests/ShoeTracker.Api.Tests/ShoeTracker.Api.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/ShoeTracker.Api.Tests/ShoeTracker.Api.Tests.csproj --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test tests/ShoeTracker.Api.Tests/ShoeTracker.Api.Tests.csproj --no-build --configuration Release
+
+  client:
+    name: Client lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
