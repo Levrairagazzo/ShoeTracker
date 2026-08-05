@@ -11,13 +11,26 @@ services:
   client:
     build:
       context: ./client
-    ports:
-      - "8080:80"
     volumes:
       - ./secrets/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       - api
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - client
+    restart: unless-stopped
+
 volumes:
   shoe-data:
+  caddy-data:
+  caddy-config:

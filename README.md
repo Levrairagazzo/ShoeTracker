@@ -67,6 +67,8 @@ docker compose up --build
 
 The client will be available at `http://localhost:8080`, proxying API calls to the API service.
 
+> Note: `docker-compose.yml` also includes a `caddy` service for production HTTPS (see "Deploying" below). Caddy can't obtain a certificate for `milesleft.run` from `localhost`, so for local dev run `docker compose up --build api client` instead and hit the client container directly — or add back a `ports: - "8080:80"` mapping on `client` for the session.
+
 ### Manually
 
 **API**
@@ -106,11 +108,11 @@ To add or change a user later: `htpasswd -B secrets/.htpasswd <username>` (drop 
 
 **2. Put it behind HTTPS.**
 
-nginx here only speaks plain HTTP — it's meant to sit behind a host that terminates TLS for you (e.g. Fly.io's automatic HTTPS, or a Cloudflare Tunnel), not to manage certificates itself. Basic Auth credentials are only base64-encoded, not encrypted, so the app should never be exposed over plain HTTP once it's off `localhost`.
+nginx here only speaks plain HTTP — it's meant to sit behind something that terminates TLS for you. This repo ships a `caddy` service (`docker-compose.yml`) and a root-level `Caddyfile` that does exactly that: point a domain's DNS A record at your host, edit the `Caddyfile` to use your domain, and Caddy automatically obtains and renews a Let's Encrypt certificate for it, terminating HTTPS and proxying to the `client` service. Basic Auth credentials are only base64-encoded, not encrypted, so the app should never be exposed over plain HTTP once it's off `localhost` — Caddy handles that here, and `client` intentionally publishes no host port of its own so Caddy is the only entry point.
 
 **3. Set `AllowedHosts` once you have a real domain.**
 
-By default the API answers to any hostname (`AllowedHosts: "*"` in `appsettings.json`). Once you know the domain the app will actually live at, set it via an `ALLOWED_HOSTS` environment variable (e.g. in a `.env` file next to `docker-compose.yml`, which `docker compose` picks up automatically):
+By default the API answers to any hostname (`AllowedHosts: "*"` in `appsettings.json`). Once you know the domain the app will actually live at, set it via an `ALLOWED_HOSTS` environment variable — copy `.env.example` to `.env` next to `docker-compose.yml` (gitignored, `docker compose` picks it up automatically) and fill in your domain:
 
 ```
 ALLOWED_HOSTS=yourdomain.example.com
