@@ -6,9 +6,9 @@ ShoeTracker is a small web app for runners to track mileage on their running sho
 
 ## Features
 
-- **Add shoes** — record a name, brand, purchase date, and a retirement threshold (in km, defaults to 700 km).
-- **Log runs** — attach a date and distance (km) to a specific shoe.
-- **Shoe list / dashboard** — see every shoe with its total accumulated distance and a status of `OK` or `Retire me!` once it crosses its threshold.
+- **Add, edit, and delete shoes** — record a name, brand, purchase date, and a retirement threshold (in km, defaults to 700 km); deleting a shoe cascades to its runs.
+- **Log, edit, and delete runs** — attach a date and distance (km) to a specific shoe, with a per-shoe run history view.
+- **Shoe grid / dashboard** — every shoe as an expandable card showing its total accumulated distance and a status of `OK` or `Retire me!` once it crosses its threshold; expanding a card lazily loads its run history.
 - **Automatic mileage totals** — total distance and retirement status are computed server-side from the shoe's logged runs, not stored redundantly.
 - **Input validation** — required fields, positive distances/thresholds, and a rule preventing runs from being logged with a future date.
 
@@ -24,11 +24,12 @@ The app is a classic two-tier web application: a single-page React frontend that
                                               └─────────────────────┘
 ```
 
-- **Client** (`client/`): a Vite + React + TypeScript SPA. `App.tsx` loads the shoe list on mount and renders three pieces: `ShoeList`, `AddShoeForm`, and `LogRunForm`. All server communication goes through a small typed fetch wrapper, `api/shoeTrackerClient.ts`, which calls a relative `/api` base path and surfaces validation errors (`ApiError` wraps the API's `ProblemDetails` response).
+- **Client** (`client/`): a Vite + React + TypeScript SPA. `App.tsx` loads the shoe list on mount, renders a header with "Log Run"/"Add Shoe" actions that open `Modal`-wrapped forms, and renders `ShoeGrid`. `ShoeGrid` renders a `ShoeCard` per shoe (an expand/collapse card with edit/delete actions and a lazily-loaded `RunHistoryList`); `ShoeForm` is dual-purpose for both creating and editing a shoe. All server communication goes through a small typed fetch wrapper, `api/shoeTrackerClient.ts`, which calls a relative `/api` base path and surfaces validation errors (`ApiError` wraps the API's `ProblemDetails` response).
 - **API** (`src/ShoeTracker.Api/`): an ASP.NET Core minimal API (no MVC controllers). Endpoints are grouped by resource in `Endpoints/ShoeEndpoints.cs` and `Endpoints/RunEndpoints.cs`, registered via extension methods (`MapShoeEndpoints`, `MapRunEndpoints`) in `Program.cs`. Request/response shapes are plain C# records in `Dtos/`. Domain entities (`Models/Shoe.cs`, `Models/Run.cs`) are persisted via EF Core (`Data/ShoeTrackerContext.cs`), with a one-to-many relationship between a shoe and its runs. Mileage math (total distance, over-threshold check) lives in `Services/MileageCalculator.cs`, kept separate from the endpoint handlers so it's independently unit-testable.
 - **Database**: SQLite, accessed through EF Core migrations (`Migrations/`). On startup, `Program.cs` runs `db.Database.Migrate()` so the schema is always up to date. In Docker, the SQLite file lives on a named volume (`shoe-data`) so data survives container restarts.
 - **Tests** (`tests/ShoeTracker.Api.Tests/`): xUnit tests for the mileage calculation logic.
 - **Reverse proxy**: in the Docker setup, nginx (`client/nginx.conf`) serves the built static SPA and proxies any `/api/*` request to the API container, so the browser only ever talks to one origin.
+- **CI**: GitHub Actions (`.github/workflows/ci.yml`) runs `dotnet test` and `npm run lint && npm run build` on every push and pull request. The `prod` branch requires both checks to pass before a PR can merge.
 
 ### API endpoints
 
@@ -37,7 +38,12 @@ The app is a classic two-tier web application: a single-page React frontend that
 | `GET` | `/shoes` | List all shoes with computed total distance and retirement status |
 | `GET` | `/shoes/{id}` | Get a single shoe |
 | `POST` | `/shoes` | Create a shoe |
+| `PUT` | `/shoes/{id}` | Update a shoe |
+| `DELETE` | `/shoes/{id}` | Delete a shoe (cascades to its runs) |
+| `GET` | `/shoes/{shoeId}/runs` | List a shoe's runs, most recent first |
 | `POST` | `/shoes/{shoeId}/runs` | Log a run against a shoe |
+| `PUT` | `/shoes/{shoeId}/runs/{id}` | Update a run |
+| `DELETE` | `/shoes/{shoeId}/runs/{id}` | Delete a run |
 
 ## Tech stack
 
