@@ -1,0 +1,9 @@
+# Local dev convenience: publishes the client on localhost:8080 directly,
+# bypassing Caddy (which can't get a real TLS cert without a public domain
+# pointed at your machine). Copy this file to docker-compose.override.yml
+# (gitignored, auto-merged by `docker compose up`, never deployed) and
+# visit http://localhost:8080.
+services:
+  client:
+    ports:
+      - "8080:80"

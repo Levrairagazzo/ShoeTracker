@@ -27,6 +27,9 @@ lerna-debug.log*
 secrets/
 .env
 
+# Local Docker Compose overrides (copied from docker-compose.override.yml.example)
+docker-compose.override.yml
+
 # Local database backups
 backups/
 
