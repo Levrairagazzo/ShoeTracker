@@ -10,7 +10,7 @@ public static class ShoeEndpoints
 {
     public static void MapShoeEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/shoes");
+        var group = app.MapGroup("/shoes").RequireAuthorization();
 
         group.MapPost("/", async (CreateShoeRequest request, ShoeTrackerContext db) =>
         {

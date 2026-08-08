@@ -31,7 +31,7 @@ public static class RunEndpoints
             await db.SaveChangesAsync();
 
             return Results.Created($"/shoes/{shoeId}/runs/{run.Id}", ToResponse(run));
-        });
+        }).RequireAuthorization();
 
         app.MapGet("/shoes/{shoeId:int}/runs", async (int shoeId, ShoeTrackerContext db) =>
         {
@@ -48,7 +48,7 @@ public static class RunEndpoints
                 .ToListAsync();
 
             return Results.Ok(runs.Select(ToResponse));
-        });
+        }).RequireAuthorization();
 
         app.MapPut("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, CreateRunRequest request, ShoeTrackerContext db) =>
         {
@@ -64,7 +64,7 @@ public static class RunEndpoints
             await db.SaveChangesAsync();
 
             return Results.Ok(ToResponse(run));
-        });
+        }).RequireAuthorization();
 
         app.MapDelete("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, ShoeTrackerContext db) =>
         {
@@ -75,7 +75,7 @@ public static class RunEndpoints
             await db.SaveChangesAsync();
 
             return Results.NoContent();
-        });
+        }).RequireAuthorization();
     }
 
     private static IResult? ValidateRun(DateOnly date, double distanceKm)
