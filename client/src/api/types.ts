@@ -33,3 +33,13 @@ export interface ValidationProblem {
   status: number
   errors: Record<string, string[]>
 }
+
+export interface CurrentUser {
+  id: number
+  email: string
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+}

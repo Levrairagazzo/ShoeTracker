@@ -9,6 +9,8 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
 
     public DbSet<Run> Runs => Set<Run>();
 
+    public DbSet<User> Users => Set<User>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Shoe>()
@@ -16,5 +18,9 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
             .WithOne(r => r.Shoe)
             .HasForeignKey(r => r.ShoeId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
     }
 }

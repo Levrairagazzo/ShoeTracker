@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ShoeForm } from './components/ShoeForm'
 import { LogRunForm } from './components/LogRunForm'
+import { LoginScreen } from './components/LoginScreen'
 import { Modal } from './components/Modal'
 import { ShoeGrid } from './components/ShoeGrid'
 import { PlusIcon } from './components/icons'
 import { shoeTrackerClient } from './api/shoeTrackerClient'
-import type { Shoe } from './api/types'
+import type { CurrentUser, Shoe } from './api/types'
 
 function SkeletonGrid() {
   return (
@@ -21,6 +22,8 @@ function SkeletonGrid() {
 }
 
 function App() {
+  const [user, setUser] = useState<CurrentUser | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [shoes, setShoes] = useState<Shoe[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -40,14 +43,42 @@ function App() {
   }, [])
 
   useEffect(() => {
-    loadShoes()
-  }, [loadShoes])
+    async function checkSession() {
+      try {
+        const result = await shoeTrackerClient.me()
+        setUser(result)
+      } catch {
+        setUser(null)
+      } finally {
+        setSessionLoading(false)
+      }
+    }
+
+    checkSession()
+  }, [])
+
+  useEffect(() => {
+    if (user) loadShoes()
+  }, [user, loadShoes])
+
+  async function handleLogout() {
+    await shoeTrackerClient.logout()
+    setUser(null)
+  }
+
+  if (sessionLoading) {
+    return null
+  }
+
+  if (!user) {
+    return <LoginScreen onSuccess={setUser} />
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-8 sm:py-10">
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1>Shoe Mileage Tracker</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setIsLogRunOpen(true)}
@@ -62,6 +93,13 @@ function App() {
           >
             <PlusIcon className="size-4" />
             Add Shoe
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-full px-4 py-2 text-sm font-medium text-text hover:bg-border/50"
+          >
+            Log out
           </button>
         </div>
       </header>

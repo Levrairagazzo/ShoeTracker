@@ -38,6 +38,11 @@ Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core min
 | `POST` | `/shoes/{shoeId}/runs` | Log a run against a shoe |
 | `PUT` | `/shoes/{shoeId}/runs/{id}` | Update a run |
 | `DELETE` | `/shoes/{shoeId}/runs/{id}` | Delete a run |
+| `POST` | `/auth/login` | Log in with email/password, establishes a cookie session |
+| `POST` | `/auth/logout` | Log out, clears the session (requires an active session) |
+| `GET` | `/auth/me` | Get the current logged-in user (requires an active session) |
+
+Note: `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active app-level login session (`.RequireAuthorization()`) but are not yet scoped per-user (see "Deployment & auth" below) — that scoping is planned for a later step.
 
 Validation logic shared between create/update is factored into a private `Validate...` helper in each endpoint file — follow that pattern rather than duplicating the checks inline when adding new mutating endpoints.
 
@@ -87,7 +92,9 @@ dotnet ef database update
 
 ## Deployment & auth
 
-- The app has no application-level user accounts (single-user by design). The whole app — static SPA and `/api/*` proxy alike — is gated by HTTP Basic Auth enforced in `client/nginx.conf` (`auth_basic`), backed by a `secrets/.htpasswd` file that is git-ignored and never baked into the Docker image. It's mounted read-only into the `client` container via `docker-compose.yml`; the container refuses to start without it. Generate credentials with `htpasswd -c -B secrets/.htpasswd <username>` (see README's "Deploying" section).
+- The app has a single application-level user account (email + PBKDF2-hashed password, in a `Users` table via `Services/PasswordHasher.cs`) — there's no self-serve sign-up. The one account is created by a startup seed step in `Program.cs`: if no `User` row exists yet, it reads `SeedAdminEmail`/`SeedAdminPassword` from configuration and creates the account (idempotent — re-runs are a no-op once the account exists, so leaving the env vars set permanently is safe). `POST /auth/login` establishes an ASP.NET Core cookie-based session (14-day sliding expiration); `GET /auth/me` / `POST /auth/logout` round out the session lifecycle. This app-level login is a separate, *inner* layer. `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active login session (`.RequireAuthorization()`) but are not yet scoped to the specific logged-in user's data (planned for a later step).
+- For local dev, set the seed credentials via `dotnet user-secrets set "SeedAdminEmail" "..."` / `"SeedAdminPassword" "..."` from `src/ShoeTracker.Api/` (or shell env vars) — never put real credentials in `appsettings.Development.json`, which is committed to git.
+- The static SPA is gated by HTTP Basic Auth enforced in `client/nginx.conf` (`auth_basic`), backed by a `secrets/.htpasswd` file that is git-ignored and never baked into the Docker image. It's mounted read-only into the `client` container via `docker-compose.yml`; the container refuses to start without it. Generate credentials with `htpasswd -c -B secrets/.htpasswd <username>` (see README's "Deploying" section). **`/api/*` is deliberately excluded from Basic Auth** (`auth_basic off;` in `client/nginx.conf`'s `/api/` location) — nginx re-challenging fetch()-based API calls with its own Basic Auth prompt caused a confusing double-login-popup bug, so `/api/*` relies solely on the app-level cookie session above for protection instead.
 - TLS is expected to be terminated by the hosting platform (not nginx) — nginx only ever speaks plain HTTP.
 - `AllowedHosts` is wired as an environment variable override in `docker-compose.yml` (`ALLOWED_HOSTS`, defaulting to `*`) so the real deploy domain can be set via a `.env` file without a code change.
 - `appsettings.Production.json` quiets logging for `ASPNETCORE_ENVIRONMENT=Production`; note `dotnet run` applies `Properties/launchSettings.json`'s `ASPNETCORE_ENVIRONMENT=Development` regardless of shell env vars unless you pass `--no-launch-profile`.

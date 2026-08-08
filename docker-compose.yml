@@ -4,6 +4,8 @@ services:
       context: ./src/ShoeTracker.Api
     environment:
       - AllowedHosts=${ALLOWED_HOSTS:-*}
+      - SeedAdminEmail=${SEED_ADMIN_EMAIL}
+      - SeedAdminPassword=${SEED_ADMIN_PASSWORD}
     volumes:
       - shoe-data:/data
     restart: unless-stopped

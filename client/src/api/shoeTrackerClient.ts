@@ -1,4 +1,4 @@
-import type { CreateRunRequest, CreateShoeRequest, Run, Shoe, ValidationProblem } from './types'
+import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, ValidationProblem } from './types'
 
 const BASE_URL = '/api'
 
@@ -54,6 +54,13 @@ export const shoeTrackerClient = {
 
   deleteRun: (shoeId: number, id: number) =>
     request<void>(`/shoes/${shoeId}/runs/${id}`, { method: 'DELETE' }),
+
+  login: (body: LoginRequest) =>
+    request<CurrentUser>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
+
+  me: () => request<CurrentUser>('/auth/me'),
 }
 
 export { ApiError }
