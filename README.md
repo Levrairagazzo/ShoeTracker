@@ -110,24 +110,13 @@ dotnet test
 
 ## Deploying
 
-The app has a single app-level login account (see "Running locally" above), sitting behind an outer HTTP Basic Auth gate — it's designed for a single person to run. Before deploying anywhere reachable from the internet:
+The app has a single app-level login account (see "Running locally" above) — it's designed for a single person to run. Before deploying anywhere reachable from the internet:
 
-**1. Set a username and password for the outer Basic Auth gate.**
+**1. Put it behind HTTPS.**
 
-```bash
-mkdir -p secrets
-htpasswd -c -B secrets/.htpasswd <your-username>
-```
+nginx here only speaks plain HTTP — it's meant to sit behind something that terminates TLS for you. This repo ships a `caddy` service (`docker-compose.yml`) and a root-level `Caddyfile` that does exactly that: point a domain's DNS A record at your host, edit the `Caddyfile` to use your domain, and Caddy automatically obtains and renews a Let's Encrypt certificate for it, terminating HTTPS and proxying to the `client` service. The app-level login's session cookie should never travel over plain HTTP once it's off `localhost` — Caddy handles that here, and `client` intentionally publishes no host port of its own so Caddy is the only entry point.
 
-This creates `secrets/.htpasswd` (bcrypt-hashed, `.gitignore`d — never commit it) and `docker-compose.yml` mounts it into the `client` container at `/etc/nginx/.htpasswd`. nginx (`client/nginx.conf`) gates the static site behind it via `auth_basic`. If the file isn't present, the container refuses to start rather than serving unauthenticated. `/api/*` is intentionally excluded from Basic Auth (nginx re-challenging JS `fetch()` calls caused a confusing double-login-popup bug) and instead relies solely on the app-level login above for protection.
-
-To add or change a user later: `htpasswd -B secrets/.htpasswd <username>` (drop `-c`, which would overwrite the file).
-
-**2. Put it behind HTTPS.**
-
-nginx here only speaks plain HTTP — it's meant to sit behind something that terminates TLS for you. This repo ships a `caddy` service (`docker-compose.yml`) and a root-level `Caddyfile` that does exactly that: point a domain's DNS A record at your host, edit the `Caddyfile` to use your domain, and Caddy automatically obtains and renews a Let's Encrypt certificate for it, terminating HTTPS and proxying to the `client` service. Basic Auth credentials are only base64-encoded, not encrypted, so the app should never be exposed over plain HTTP once it's off `localhost` — Caddy handles that here, and `client` intentionally publishes no host port of its own so Caddy is the only entry point.
-
-**3. Set `AllowedHosts` and your login credentials.**
+**2. Set `AllowedHosts` and your login credentials.**
 
 By default the API answers to any hostname (`AllowedHosts: "*"` in `appsettings.json`). Once you know the domain the app will actually live at, set it via an `ALLOWED_HOSTS` environment variable — copy `.env.example` to `.env` next to `docker-compose.yml` (gitignored, `docker compose` picks it up automatically) and fill in your domain, plus `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` for the app-level login account (only used to create the account on first boot — see "Running locally" above):
 

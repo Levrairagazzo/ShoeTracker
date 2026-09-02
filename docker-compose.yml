@@ -13,8 +13,6 @@ services:
   client:
     build:
       context: ./client
-    volumes:
-      - ./secrets/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
       - api
     restart: unless-stopped
