@@ -43,6 +43,13 @@ export interface CurrentUser {
   email: string
 }
 
+export interface StravaStatus {
+  /** false when the server has no Strava API credentials configured */
+  available: boolean
+  connected: boolean
+  athleteName: string | null
+}
+
 export interface LoginRequest {
   email: string
   password: string

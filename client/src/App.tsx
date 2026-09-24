@@ -4,6 +4,7 @@ import { LogRunForm } from './components/LogRunForm'
 import { LoginScreen } from './components/LoginScreen'
 import { Modal } from './components/Modal'
 import { ShoeGrid } from './components/ShoeGrid'
+import { StravaConnection } from './components/StravaConnection'
 import { PlusIcon } from './components/icons'
 import { shoeTrackerClient } from './api/shoeTrackerClient'
 import type { CurrentUser, Shoe } from './api/types'
@@ -103,6 +104,8 @@ function App() {
           </button>
         </div>
       </header>
+
+      <StravaConnection />
 
       {loading && <SkeletonGrid />}
 

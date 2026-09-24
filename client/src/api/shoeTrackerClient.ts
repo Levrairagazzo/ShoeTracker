@@ -1,4 +1,4 @@
-import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, ValidationProblem } from './types'
+import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, StravaStatus, ValidationProblem } from './types'
 
 const BASE_URL = '/api'
 
@@ -61,6 +61,13 @@ export const shoeTrackerClient = {
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
 
   me: () => request<CurrentUser>('/auth/me'),
+
+  stravaStatus: () => request<StravaStatus>('/strava/status'),
+
+  disconnectStrava: () => request<void>('/strava/connection', { method: 'DELETE' }),
+
+  /** Navigate the whole page here (not fetch): the API redirects on to Strava's consent screen. */
+  stravaConnectUrl: `${BASE_URL}/strava/connect`,
 }
 
 export { ApiError }
