@@ -48,7 +48,7 @@ These apply across the epics:
 **E1a — Connect and import history**
 - **Before we start (me):** register a Strava API app at strava.com/settings/api. Callback domains are `milesleft.run`, plus `localhost` for dev. The client id and secret go in user-secrets locally and `.env` in prod, never in committed config.
 - A "Connect Strava" OAuth flow (scope `activity:read_all`), and a way to disconnect.
-- Tokens are stored per user, encrypted with ASP.NET Core Data Protection, and refreshed when they expire. The key ring lives on the `shoe-data` volume, and the backup/restore scripts include it. If the keys are ever lost, the fix is just reconnecting Strava.
+- Tokens are stored per user, encrypted with ASP.NET Core Data Protection, and refreshed when they expire. The key ring lives on the `shoe-data` volume, and the backup/restore scripts include it. If the keys are ever lost, the fix is just reconnecting Strava. Persisting the key ring also means login sessions survive redeploys.
 - On connect, my full history is imported as **unassigned** runs. `Run`, `TrailRun` and `VirtualRun` (treadmill) all count as runs. Importing is incremental and idempotent, keyed on `StravaActivityId`.
 - Rate limits (100 requests per 15 min, 1,000 per day) aren't a concern: 200 activities per page, so years of history is a handful of calls.
 

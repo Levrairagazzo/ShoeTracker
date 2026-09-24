@@ -11,6 +11,8 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<StravaConnection> StravaConnections => Set<StravaConnection>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Shoe>()
@@ -42,5 +44,11 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
         modelBuilder.Entity<Run>()
             .HasIndex(r => new { r.UserId, r.StravaActivityId })
             .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasOne<StravaConnection>()
+            .WithOne(c => c.User)
+            .HasForeignKey<StravaConnection>(c => c.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

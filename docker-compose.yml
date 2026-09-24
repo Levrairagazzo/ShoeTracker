@@ -6,6 +6,12 @@ services:
       - AllowedHosts=${ALLOWED_HOSTS:-*}
       - SeedAdminEmail=${SEED_ADMIN_EMAIL}
       - SeedAdminPassword=${SEED_ADMIN_PASSWORD}
+      - Strava__ClientId=${STRAVA_CLIENT_ID:-}
+      - Strava__ClientSecret=${STRAVA_CLIENT_SECRET:-}
+      - Strava__RedirectUri=${STRAVA_REDIRECT_URI:-https://milesleft.run/api/strava/callback}
+      # Key ring for the auth cookie and the encrypted Strava tokens; on the data
+      # volume so it survives rebuilds (and is picked up by the backup service).
+      - DataProtection__KeysPath=/data/keys
     volumes:
       - shoe-data:/data
     restart: unless-stopped

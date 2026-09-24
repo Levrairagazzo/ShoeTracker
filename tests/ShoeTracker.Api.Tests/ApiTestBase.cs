@@ -2,25 +2,34 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Dtos;
 using ShoeTracker.Api.Models;
 using ShoeTracker.Api.Services;
+using ShoeTracker.Api.Services.Strava;
 
 namespace ShoeTracker.Api.Tests;
 
 /// <summary>
 /// Runs the real API in-process against a throwaway SQLite file. Two accounts exist:
 /// <see cref="OwnerEmail"/> (created by the app's startup seed step) and <see cref="OtherEmail"/>.
+/// Strava is configured with dummy credentials and answered by <see cref="Strava"/>.
 /// </summary>
 public abstract class ApiTestBase : IDisposable
 {
     protected const string OwnerEmail = "owner@test.dev";
     protected const string OtherEmail = "other@test.dev";
     protected const string Password = "test-password";
+    protected const string StravaClientId = "test-client-id";
+    protected const string StravaClientSecret = "test-client-secret";
+    protected const string StravaRedirectUri = "http://localhost/api/strava/callback";
 
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"shoetracker-test-{Guid.NewGuid()}.db");
+    private readonly string _keysPath = Path.Combine(Path.GetTempPath(), $"shoetracker-test-keys-{Guid.NewGuid()}");
+
+    protected FakeStravaHandler Strava { get; } = new();
 
     protected WebApplicationFactory<Program> Factory { get; }
 
@@ -31,6 +40,13 @@ public abstract class ApiTestBase : IDisposable
             builder.UseSetting("ConnectionStrings:ShoeTrackerContext", $"Data Source={_dbPath};Pooling=False");
             builder.UseSetting("SeedAdminEmail", OwnerEmail);
             builder.UseSetting("SeedAdminPassword", Password);
+            // Overrides any real credentials from user-secrets.
+            builder.UseSetting("Strava:ClientId", StravaClientId);
+            builder.UseSetting("Strava:ClientSecret", StravaClientSecret);
+            builder.UseSetting("Strava:RedirectUri", StravaRedirectUri);
+            builder.UseSetting("DataProtection:KeysPath", _keysPath);
+            builder.ConfigureTestServices(services =>
+                services.AddHttpClient<StravaClient>().ConfigurePrimaryHttpMessageHandler(() => Strava));
         });
 
         WithDb(db =>
@@ -44,6 +60,7 @@ public abstract class ApiTestBase : IDisposable
     {
         Factory.Dispose();
         File.Delete(_dbPath);
+        if (Directory.Exists(_keysPath)) Directory.Delete(_keysPath, recursive: true);
         GC.SuppressFinalize(this);
     }
 
@@ -57,7 +74,7 @@ public abstract class ApiTestBase : IDisposable
 
     protected async Task<HttpClient> LoginAsync(string email = OwnerEmail)
     {
-        var client = Factory.CreateClient();
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest(email, Password));
         response.EnsureSuccessStatusCode();
         return client;
