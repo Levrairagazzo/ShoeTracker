@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Endpoints;
 using ShoeTracker.Api.Models;
@@ -40,7 +42,13 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ShoeTrackerContext>();
-    db.Database.Migrate();
+
+    // AddShoeOwnership assigns pre-existing shoes to the seeded admin account, so on a
+    // database that hasn't reached it yet, migrate only as far as AddUsers, seed, then finish.
+    if (!db.Database.GetAppliedMigrations().Any(m => m.EndsWith("_AddShoeOwnership")))
+    {
+        db.GetService<IMigrator>().Migrate("AddUsers");
+    }
 
     if (!db.Users.Any())
     {
@@ -57,6 +65,8 @@ using (var scope = app.Services.CreateScope())
             app.Logger.LogWarning("No users exist and SeedAdminEmail/SeedAdminPassword are not configured; login is unavailable until seeded.");
         }
     }
+
+    db.Database.Migrate();
 }
 
 app.UseAuthentication();

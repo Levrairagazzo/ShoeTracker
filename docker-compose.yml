@@ -17,6 +17,21 @@ services:
       - api
     restart: unless-stopped
 
+  backup:
+    build:
+      context: ./backup
+    environment:
+      - BACKUP_INTERVAL_HOURS=${BACKUP_INTERVAL_HOURS:-24}
+      - BACKUP_KEEP=${BACKUP_KEEP:-14}
+    volumes:
+      # Read-write on purpose: WAL-mode SQLite needs to touch its -wal/-shm
+      # sidecar files even to read, so a read-only mount can't back it up.
+      - shoe-data:/data
+      - ./backups:/backups
+    depends_on:
+      - api
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     ports:

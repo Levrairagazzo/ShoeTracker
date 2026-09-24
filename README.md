@@ -134,10 +134,24 @@ Leaving `ALLOWED_HOSTS` unset keeps today's behavior (`*`), so it's safe to skip
 
 ### Backing up the database
 
-All data lives in one SQLite file inside the `shoe-data` Docker volume — nothing backs it up automatically. To take a manual snapshot while the app is running:
+All data lives in one SQLite file inside the `shoe-data` Docker volume. The `backup` service in `docker-compose.yml` snapshots it automatically: once when it starts, then every `BACKUP_INTERVAL_HOURS` (default 24). It keeps the newest `BACKUP_KEEP` (default 14) automated snapshots and deletes older ones. Both are set in `.env`. Snapshots land in `./backups/` on the host as `shoetracker-auto-<UTC timestamp>.db` (gitignored — this is your real running log, never commit it).
+
+Each snapshot uses SQLite's own backup mechanism rather than a file copy, so it's safe while the app is writing, and it's integrity-checked before it's kept. Watch it with `docker compose logs backup`.
+
+To take a one-off snapshot (e.g. right before a deploy that runs migrations):
 
 ```bash
 ./scripts/backup-db.sh
 ```
 
-This writes a timestamped copy to `./backups/` (gitignored — these are your real running logs, never commit them). It's safe to run at any time; it takes a consistent snapshot via SQLite's own backup mechanism rather than copying the file directly, so it won't produce a corrupt copy even if the app is actively writing to it.
+Manual snapshots are named `shoetracker-<UTC timestamp>.db` and are **never** deleted by the automated retention.
+
+> These backups live on the same host as the database, so they protect against bad writes, bad migrations and accidental deletes — not against losing the host itself. Copy `./backups/` somewhere off the machine periodically if that matters to you.
+
+### Restoring the database
+
+```bash
+./scripts/restore-db.sh backups/shoetracker-auto-20260925-030000.db
+```
+
+This integrity-checks the backup, asks you to confirm (pass `--yes` to skip), takes a manual safety snapshot of the current database so the restore can itself be undone, stops the `api` and `backup` services, swaps the file into the volume, and starts them again. Anything written after the chosen backup was taken is lost (apart from the safety snapshot).
