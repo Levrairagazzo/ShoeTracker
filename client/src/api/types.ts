@@ -13,8 +13,12 @@ export interface Run {
   id: number
   date: string
   distanceKm: number
-  shoeId: number
+  /** null while the run isn't assigned to a shoe (e.g. an imported Strava run) */
+  shoeId: number | null
+  source: RunSource
 }
+
+export type RunSource = 'Manual' | 'Strava'
 
 export interface CreateShoeRequest {
   name: string

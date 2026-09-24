@@ -69,6 +69,7 @@ public class AuthEndpointsTests : ApiTestBase
     [InlineData("PUT", "/shoes/1")]
     [InlineData("DELETE", "/shoes/1")]
     [InlineData("GET", "/shoes/1/runs")]
+    [InlineData("GET", "/runs")]
     [InlineData("POST", "/shoes/1/runs")]
     [InlineData("PUT", "/shoes/1/runs/1")]
     [InlineData("DELETE", "/shoes/1/runs/1")]

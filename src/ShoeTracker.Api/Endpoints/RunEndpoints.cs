@@ -24,7 +24,9 @@ public static class RunEndpoints
 
             var run = new Run
             {
+                UserId = userId,
                 ShoeId = shoeId,
+                Source = RunSource.Manual,
                 Date = request.Date,
                 DistanceKm = request.DistanceKm
             };
@@ -45,7 +47,24 @@ public static class RunEndpoints
             }
 
             var runs = await db.Runs
-                .Where(r => r.ShoeId == shoeId)
+                .Where(r => r.ShoeId == shoeId && r.UserId == userId)
+                .OrderByDescending(r => r.Date)
+                .ThenByDescending(r => r.Id)
+                .ToListAsync();
+
+            return Results.Ok(runs.Select(ToResponse));
+        }).RequireAuthorization();
+
+        app.MapGet("/runs", async (bool? unassigned, ShoeTrackerContext db, ClaimsPrincipal user) =>
+        {
+            var userId = user.GetUserId();
+            var query = db.Runs.Where(r => r.UserId == userId);
+            if (unassigned == true)
+            {
+                query = query.Where(r => r.ShoeId == null);
+            }
+
+            var runs = await query
                 .OrderByDescending(r => r.Date)
                 .ThenByDescending(r => r.Id)
                 .ToListAsync();
@@ -59,7 +78,7 @@ public static class RunEndpoints
             if (validation is not null) return validation;
 
             var userId = user.GetUserId();
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.Shoe!.UserId == userId);
+            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.UserId == userId);
             if (run is null) return Results.NotFound();
 
             run.Date = request.Date;
@@ -73,7 +92,7 @@ public static class RunEndpoints
         app.MapDelete("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
             var userId = user.GetUserId();
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.Shoe!.UserId == userId);
+            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.UserId == userId);
             if (run is null) return Results.NotFound();
 
             db.Runs.Remove(run);
@@ -104,5 +123,5 @@ public static class RunEndpoints
         return null;
     }
 
-    private static RunResponse ToResponse(Run run) => new(run.Id, run.Date, run.DistanceKm, run.ShoeId);
+    private static RunResponse ToResponse(Run run) => new(run.Id, run.Date, run.DistanceKm, run.ShoeId, run.Source);
 }

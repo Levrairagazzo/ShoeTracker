@@ -44,6 +44,7 @@ The app is a classic two-tier web application: a single-page React frontend that
 | `POST` | `/shoes/{shoeId}/runs` | Log a run against a shoe |
 | `PUT` | `/shoes/{shoeId}/runs/{id}` | Update a run |
 | `DELETE` | `/shoes/{shoeId}/runs/{id}` | Delete a run |
+| `GET` | `/runs` | List all of the current user's runs, most recent first, including runs not assigned to a shoe (`?unassigned=true` returns only those) |
 | `POST` | `/auth/login` | Log in, establishing a cookie session |
 | `POST` | `/auth/logout` | Log out and clear the session |
 | `GET` | `/auth/me` | Get the current logged-in user |
