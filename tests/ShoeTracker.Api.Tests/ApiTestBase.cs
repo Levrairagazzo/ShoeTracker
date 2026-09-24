@@ -8,6 +8,7 @@ using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Dtos;
 using ShoeTracker.Api.Models;
 using ShoeTracker.Api.Services;
+using ShoeTracker.Api.Services.Geocoding;
 using ShoeTracker.Api.Services.Strava;
 
 namespace ShoeTracker.Api.Tests;
@@ -15,7 +16,8 @@ namespace ShoeTracker.Api.Tests;
 /// <summary>
 /// Runs the real API in-process against a throwaway SQLite file. Two accounts exist:
 /// <see cref="OwnerEmail"/> (created by the app's startup seed step) and <see cref="OtherEmail"/>.
-/// Strava is configured with dummy credentials and answered by <see cref="Strava"/>.
+/// Strava is configured with dummy credentials and answered by <see cref="Strava"/>; the
+/// geocoder is answered by <see cref="Nominatim"/>, and its background service is off.
 /// </summary>
 public abstract class ApiTestBase : IDisposable
 {
@@ -29,7 +31,9 @@ public abstract class ApiTestBase : IDisposable
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"shoetracker-test-{Guid.NewGuid()}.db");
     private readonly string _keysPath = Path.Combine(Path.GetTempPath(), $"shoetracker-test-keys-{Guid.NewGuid()}");
 
-    protected FakeStravaHandler Strava { get; } = new();
+    protected FakeHttpHandler Strava { get; } = new();
+
+    protected FakeHttpHandler Nominatim { get; } = new();
 
     protected WebApplicationFactory<Program> Factory { get; }
 
@@ -45,8 +49,14 @@ public abstract class ApiTestBase : IDisposable
             builder.UseSetting("Strava:ClientSecret", StravaClientSecret);
             builder.UseSetting("Strava:RedirectUri", StravaRedirectUri);
             builder.UseSetting("DataProtection:KeysPath", _keysPath);
+            // Tests resolve place names by calling PlaceNameResolver directly, without the rate-limit pause.
+            builder.UseSetting("Geocoding:Enabled", "false");
+            builder.UseSetting("Geocoding:MinInterval", "00:00:00");
             builder.ConfigureTestServices(services =>
-                services.AddHttpClient<StravaClient>().ConfigurePrimaryHttpMessageHandler(() => Strava));
+            {
+                services.AddHttpClient<StravaClient>().ConfigurePrimaryHttpMessageHandler(() => Strava);
+                services.AddHttpClient<NominatimClient>().ConfigurePrimaryHttpMessageHandler(() => Nominatim);
+            });
         });
 
         WithDb(db =>
@@ -115,6 +125,22 @@ public abstract class ApiTestBase : IDisposable
             id = run.Id;
         });
         return id;
+    }
+
+    /// <summary>
+    /// Stores a Strava connection for the user directly (skipping the OAuth flow), with the
+    /// given access token valid for the next 6 hours.
+    /// </summary>
+    protected async Task ConnectStravaAsync(string email, string accessToken = "access-token")
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ShoeTrackerContext>();
+        var userId = db.Users.Single(u => u.Email == email).Id;
+        await scope.ServiceProvider.GetRequiredService<StravaTokenStore>().SaveAsync(
+            userId,
+            new StravaTokenResponse(accessToken, "refresh-token", DateTimeOffset.UtcNow.AddHours(6).ToUnixTimeSeconds(),
+                new StravaAthlete(12345, "Test", "Runner")),
+            "read,activity:read_all");
     }
 
     /// <summary>Returns the field names in a ValidationProblem response's <c>errors</c> object.</summary>

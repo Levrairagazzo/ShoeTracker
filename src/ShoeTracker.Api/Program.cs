@@ -7,6 +7,7 @@ using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Endpoints;
 using ShoeTracker.Api.Models;
 using ShoeTracker.Api.Services;
+using ShoeTracker.Api.Services.Geocoding;
 using ShoeTracker.Api.Services.Strava;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -51,6 +52,17 @@ if (!string.IsNullOrWhiteSpace(keysPath))
 builder.Services.Configure<StravaOptions>(builder.Configuration.GetSection(StravaOptions.SectionName));
 builder.Services.AddHttpClient<StravaClient>(client => client.BaseAddress = StravaClient.BaseAddress);
 builder.Services.AddScoped<StravaTokenStore>();
+builder.Services.AddScoped<StravaImporter>();
+
+builder.Services.Configure<GeocodingOptions>(builder.Configuration.GetSection(GeocodingOptions.SectionName));
+builder.Services.AddHttpClient<NominatimClient>(client =>
+{
+    client.BaseAddress = NominatimClient.BaseAddress;
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(NominatimClient.UserAgent);
+});
+builder.Services.AddScoped<PlaceNameResolver>();
+builder.Services.AddSingleton<PlaceNameSignal>();
+builder.Services.AddHostedService<PlaceNameBackgroundService>();
 
 var app = builder.Build();
 

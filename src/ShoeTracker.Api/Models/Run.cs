@@ -21,4 +21,14 @@ public class Run
 
     /// <summary>The Strava activity this run was imported from; null for manual runs.</summary>
     public long? StravaActivityId { get; set; }
+
+    /// <summary>Set for Strava runs; null for manual runs.</summary>
+    public RunType? Type { get; set; }
+
+    /// <summary>Whether the run was tagged as a race on Strava.</summary>
+    public bool IsRace { get; set; }
+
+    public double? StartLatitude { get; set; }
+
+    public double? StartLongitude { get; set; }
 }

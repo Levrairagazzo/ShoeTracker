@@ -18,7 +18,7 @@ public class RunEndpointsTests : ApiTestBase
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var run = await response.Content.ReadFromJsonAsync<RunResponse>();
         Assert.Equal($"/shoes/{shoe.Id}/runs/{run!.Id}", response.Headers.Location?.OriginalString);
-        Assert.Equal(new RunResponse(run.Id, new DateOnly(2026, 1, 2), 10.5, shoe.Id, RunSource.Manual), run);
+        Assert.Equal(new RunResponse(run.Id, new DateOnly(2026, 1, 2), 10.5, shoe.Id, RunSource.Manual, null, false, false, null), run);
     }
 
     [Fact]
@@ -107,6 +107,38 @@ public class RunEndpointsTests : ApiTestBase
     }
 
     [Fact]
+    public async Task ListAllRuns_WithSourceAndLimit_ReturnsTheLatestRunsFromThatSource()
+    {
+        var client = await LoginAsync();
+        var shoe = await CreateShoeAsync(client);
+        await LogRunAsync(client, shoe.Id, 1, new DateOnly(2026, 1, 9));
+        var oldest = AddUnassignedRun(OwnerEmail, 2, new DateOnly(2026, 1, 1));
+        var middle = AddUnassignedRun(OwnerEmail, 3, new DateOnly(2026, 1, 2));
+        var newest = AddUnassignedRun(OwnerEmail, 4, new DateOnly(2026, 1, 3));
+
+        var latestTwo = await client.GetFromJsonAsync<List<RunResponse>>("/runs?source=Strava&limit=2");
+        var allStrava = await client.GetFromJsonAsync<List<RunResponse>>("/runs?source=Strava");
+        var manual = await client.GetFromJsonAsync<List<RunResponse>>("/runs?source=Manual");
+
+        Assert.Equal([newest, middle], latestTwo!.Select(r => r.Id));
+        Assert.Equal([newest, middle, oldest], allStrava!.Select(r => r.Id));
+        Assert.Equal(RunSource.Manual, Assert.Single(manual!).Source);
+    }
+
+    [Theory]
+    [InlineData("/runs?limit=0")]
+    [InlineData("/runs?limit=-1")]
+    public async Task ListAllRuns_WithNonPositiveLimit_ReturnsValidationProblem(string url)
+    {
+        var client = await LoginAsync();
+
+        var response = await client.GetAsync(url);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(["limit"], await ValidationErrorFieldsAsync(response));
+    }
+
+    [Fact]
     public async Task UnassignedRuns_DoNotCountTowardAnyShoe()
     {
         var client = await LoginAsync();
@@ -128,7 +160,7 @@ public class RunEndpointsTests : ApiTestBase
         var response = await client.PutAsJsonAsync($"/shoes/{shoe.Id}/runs/{run.Id}", new CreateRunRequest(new DateOnly(2026, 1, 5), 8));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(new RunResponse(run.Id, new DateOnly(2026, 1, 5), 8, shoe.Id, RunSource.Manual), await response.Content.ReadFromJsonAsync<RunResponse>());
+        Assert.Equal(new RunResponse(run.Id, new DateOnly(2026, 1, 5), 8, shoe.Id, RunSource.Manual, null, false, false, null), await response.Content.ReadFromJsonAsync<RunResponse>());
         Assert.Equal(8, (await client.GetFromJsonAsync<ShoeResponse>($"/shoes/{shoe.Id}"))!.TotalDistanceKm);
     }
 

@@ -8,6 +8,7 @@ ShoeTracker is a small web app for runners to track mileage on their running sho
 
 - **Add, edit, and delete shoes** — record a name, brand, purchase date, and a retirement threshold (in km, defaults to 700 km); deleting a shoe cascades to its runs.
 - **Log, edit, and delete runs** — attach a date and distance (km) to a specific shoe, with a per-shoe run history view.
+- **Strava import** — connect a Strava account and import your run history (runs, trail runs and treadmill runs), with each run's type, race/ultra labels and start location (looked up on OpenStreetMap). Imported runs aren't assigned to a shoe yet.
 - **Shoe grid / dashboard** — every shoe as an expandable card showing its total accumulated distance and a status of `OK` or `Retire me!` once it crosses its threshold; expanding a card lazily loads its run history.
 - **Automatic mileage totals** — total distance and retirement status are computed server-side from the shoe's logged runs, not stored redundantly.
 - **Input validation** — required fields, positive distances/thresholds, and a rule preventing runs from being logged with a future date.
@@ -44,10 +45,11 @@ The app is a classic two-tier web application: a single-page React frontend that
 | `POST` | `/shoes/{shoeId}/runs` | Log a run against a shoe |
 | `PUT` | `/shoes/{shoeId}/runs/{id}` | Update a run |
 | `DELETE` | `/shoes/{shoeId}/runs/{id}` | Delete a run |
-| `GET` | `/runs` | List all of the current user's runs, most recent first, including runs not assigned to a shoe (`?unassigned=true` returns only those) |
+| `GET` | `/runs` | List all of the current user's runs, most recent first, including runs not assigned to a shoe. Optional filters: `?unassigned=true`, `?source=Manual\|Strava`, `?limit=N` |
 | `GET` | `/strava/connect` | Start connecting Strava: redirects the browser to Strava's consent screen |
 | `GET` | `/strava/callback` | Strava's OAuth redirect target: stores the tokens, then redirects to `/?strava=<result>` |
 | `GET` | `/strava/status` | Whether Strava is available on the server and connected for the current user |
+| `POST` | `/strava/import` | Import the current user's Strava runs (`Run`, `TrailRun`, `VirtualRun`) as unassigned runs; incremental and idempotent |
 | `DELETE` | `/strava/connection` | Disconnect Strava (revokes on Strava's side, best-effort, and deletes the stored tokens) |
 | `POST` | `/auth/login` | Log in, establishing a cookie session |
 | `POST` | `/auth/logout` | Log out and clear the session |
@@ -142,6 +144,8 @@ Leaving `ALLOWED_HOSTS` unset keeps today's behavior (`*`), so it's safe to skip
 **3. Strava credentials (optional).**
 
 Set `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` in `.env` from your Strava API app (strava.com/settings/api), whose callback domain must be your domain. The callback URL defaults to `https://milesleft.run/api/strava/callback`; override it with `STRAVA_REDIRECT_URI` for another domain. Without these, the "Connect Strava" option is hidden. Strava tokens are stored encrypted, with keys kept in the `shoe-data` volume (`/data/keys`); the same keys protect the login cookie, so sessions also survive redeploys.
+
+Run locations are looked up on OpenStreetMap's Nominatim service from the API container, so it needs outbound HTTPS access. Only the ~1 km area around each run's start is sent, never the exact start point.
 
 **4. Production logging.**
 

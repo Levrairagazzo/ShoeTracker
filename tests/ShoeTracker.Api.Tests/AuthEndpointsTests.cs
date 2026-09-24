@@ -73,6 +73,7 @@ public class AuthEndpointsTests : ApiTestBase
     [InlineData("GET", "/strava/connect")]
     [InlineData("GET", "/strava/callback")]
     [InlineData("GET", "/strava/status")]
+    [InlineData("POST", "/strava/import")]
     [InlineData("DELETE", "/strava/connection")]
     [InlineData("POST", "/shoes/1/runs")]
     [InlineData("PUT", "/shoes/1/runs/1")]
