@@ -7,6 +7,8 @@ export interface Shoe {
   isRetired: boolean
   totalDistanceKm: number
   isOverThreshold: boolean
+  /** newly imported Strava runs are assigned to this shoe */
+  isDefault: boolean
 }
 
 export interface Run {
@@ -61,6 +63,8 @@ export interface StravaStatus {
   athleteName: string | null
   /** how many of the user's runs came from Strava */
   importedRuns: number
+  /** how many of the user's runs aren't assigned to a shoe */
+  unassignedRuns: number
 }
 
 export interface StravaImportResult {

@@ -75,7 +75,7 @@ public class StravaEndpointsTests : ApiTestBase
         Assert.Equal(StravaClientSecret, exchange.Form["client_secret"]);
 
         var status = await client.GetFromJsonAsync<StravaStatusResponse>("/strava/status");
-        Assert.Equal(new StravaStatusResponse(true, true, "Test Runner", 0), status);
+        Assert.Equal(new StravaStatusResponse(true, true, "Test Runner", 0, 0), status);
 
         WithDb(db =>
         {
@@ -157,7 +157,7 @@ public class StravaEndpointsTests : ApiTestBase
 
         var status = await client.GetFromJsonAsync<StravaStatusResponse>("/strava/status");
 
-        Assert.Equal(new StravaStatusResponse(true, false, null, 0), status);
+        Assert.Equal(new StravaStatusResponse(true, false, null, 0, 0), status);
     }
 
     [Fact]

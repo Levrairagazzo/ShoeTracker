@@ -105,7 +105,7 @@ function App() {
         </div>
       </header>
 
-      <StravaConnection />
+      <StravaConnection shoes={shoes} onRunsChanged={loadShoes} />
 
       {loading && <SkeletonGrid />}
 

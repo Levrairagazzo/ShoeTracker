@@ -95,6 +95,7 @@ public static class RunEndpoints
             var userId = user.GetUserId();
             var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.UserId == userId);
             if (run is null) return Results.NotFound();
+            if (run.Source == RunSource.Strava) return StravaRunIsReadOnly();
 
             run.Date = request.Date;
             run.DistanceKm = request.DistanceKm;
@@ -109,13 +110,38 @@ public static class RunEndpoints
             var userId = user.GetUserId();
             var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.UserId == userId);
             if (run is null) return Results.NotFound();
+            if (run.Source == RunSource.Strava) return StravaRunIsReadOnly();
 
             db.Runs.Remove(run);
             await db.SaveChangesAsync();
 
             return Results.NoContent();
         }).RequireAuthorization();
+
+        // Moves any of the user's runs (manual or Strava) to another shoe, or unassigns it.
+        app.MapPut("/runs/{id:int}/shoe", async (int id, AssignRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
+        {
+            var userId = user.GetUserId();
+            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
+            if (run is null) return Results.NotFound();
+
+            if (request.ShoeId is { } shoeId && !await db.Shoes.AnyAsync(s => s.Id == shoeId && s.UserId == userId))
+            {
+                return Results.NotFound();
+            }
+
+            run.ShoeId = request.ShoeId;
+            await db.SaveChangesAsync();
+
+            return Results.Ok(await ToResponseAsync(run, places));
+        }).RequireAuthorization();
     }
+
+    // Strava is the source of truth for its runs: a local edit would be overwritten by the next
+    // import, and a local delete undone by it. Only the shoe can change (PUT /runs/{id}/shoe).
+    private static IResult StravaRunIsReadOnly() => Results.Problem(
+        "Runs imported from Strava can't be edited or deleted here. Change them on Strava, or move them to another shoe.",
+        statusCode: StatusCodes.Status409Conflict);
 
     private static IResult? ValidateRun(DateOnly date, double distanceKm)
     {

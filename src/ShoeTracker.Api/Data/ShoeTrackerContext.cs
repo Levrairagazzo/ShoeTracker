@@ -47,6 +47,12 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
             .HasIndex(r => new { r.UserId, r.StravaActivityId })
             .IsUnique();
 
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.DefaultShoe)
+            .WithMany()
+            .HasForeignKey(u => u.DefaultShoeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<Run>()
             .Property(r => r.Type)
             .HasConversion<string>();
