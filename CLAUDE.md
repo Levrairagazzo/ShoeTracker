@@ -64,7 +64,7 @@ npm run dev
 docker compose up --build
 ```
 
-**Run tests** (from `tests/ShoeTracker.Api.Tests/`) — unit tests for services, plus `WebApplicationFactory`-based integration tests (e.g. `UserScopingTests`) that run the real API against a throwaway SQLite file:
+**Run tests** (from `tests/ShoeTracker.Api.Tests/`) — unit tests for services, plus `WebApplicationFactory`-based integration tests (`AuthEndpointsTests`, `ShoeEndpointsTests`, `RunEndpointsTests`, `UserScopingTests`) that run the real API against a throwaway SQLite file. New integration tests should derive from `ApiTestBase`, which sets up the app with two accounts (`OwnerEmail`, `OtherEmail`) and provides login/create-shoe/log-run helpers:
 ```bash
 dotnet test
 ```
