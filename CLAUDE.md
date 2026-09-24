@@ -8,10 +8,10 @@ ShoeTracker is a small web app for runners to track mileage on their running sho
 
 ## Architecture
 
-Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core minimal API (`src/ShoeTracker.Api/`), backed by SQLite via EF Core. In Docker, nginx serves the built client and reverse-proxies `/api/*` to the API container so the browser only talks to one origin.
+Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core minimal API (`src/ShoeTracker.Api/`), backed by SQLite via EF Core. In Docker, Caddy terminates HTTPS in front of nginx, which serves the built client and reverse-proxies `/api/*` to the API container so the browser only talks to one origin.
 
 **API** (`src/ShoeTracker.Api/`):
-- Minimal API, no MVC controllers. Endpoints are grouped by resource in `Endpoints/ShoeEndpoints.cs` and `Endpoints/RunEndpoints.cs`, registered via extension methods (`MapShoeEndpoints`, `MapRunEndpoints`) called from `Program.cs`.
+- Minimal API, no MVC controllers. Endpoints are grouped by resource in `Endpoints/ShoeEndpoints.cs`, `Endpoints/RunEndpoints.cs` and `Endpoints/AuthEndpoints.cs`, registered via extension methods (`MapShoeEndpoints`, `MapRunEndpoints`, `MapAuthEndpoints`) called from `Program.cs`.
 - Request/response shapes are plain C# records in `Dtos/`.
 - Domain entities (`Models/Shoe.cs`, `Models/Run.cs`) are persisted via EF Core (`Data/ShoeTrackerContext.cs`); one shoe has many runs.
 - Mileage math (total distance, over-threshold check) lives in `Services/MileageCalculator.cs`, deliberately kept out of endpoint handlers so it's independently unit-testable — this is the pattern to follow for any new business logic.
@@ -59,7 +59,7 @@ npm install   # first time only
 npm run dev
 ```
 
-**Run everything via Docker Compose** (from repo root) — client at `http://localhost:8080`, proxying to the API:
+**Run everything via Docker Compose** (from repo root) — client at `http://localhost:8080` (requires the local `docker-compose.override.yml`, see "Deployment & auth"), proxying to the API:
 ```bash
 docker compose up --build
 ```
@@ -95,7 +95,8 @@ dotnet ef database update
 - The app has a single application-level user account (email + PBKDF2-hashed password, in a `Users` table via `Services/PasswordHasher.cs`) — there's no self-serve sign-up. The one account is created by a startup seed step in `Program.cs`: if no `User` row exists yet, it reads `SeedAdminEmail`/`SeedAdminPassword` from configuration and creates the account (idempotent — re-runs are a no-op once the account exists, so leaving the env vars set permanently is safe). `POST /auth/login` establishes an ASP.NET Core cookie-based session (14-day sliding expiration); `GET /auth/me` / `POST /auth/logout` round out the session lifecycle. This app-level login is a separate, *inner* layer. `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active login session (`.RequireAuthorization()`) but are not yet scoped to the specific logged-in user's data (planned for a later step).
 - For local dev, set the seed credentials via `dotnet user-secrets set "SeedAdminEmail" "..."` / `"SeedAdminPassword" "..."` from `src/ShoeTracker.Api/` (or shell env vars) — never put real credentials in `appsettings.Development.json`, which is committed to git.
 - The static SPA has no outer HTTP Basic Auth gate — `client/nginx.conf` serves it directly. The app-level cookie session described above is the only auth layer; nginx just serves the built client and reverse-proxies `/api/*` to the API container.
-- TLS is expected to be terminated by the hosting platform (not nginx) — nginx only ever speaks plain HTTP.
+- TLS is terminated by the `caddy` service in `docker-compose.yml`, configured by the root `Caddyfile` (domain `milesleft.run`, HSTS header, automatic Let's Encrypt certificates, reverse-proxying to `client:80`). nginx only ever speaks plain HTTP. Caddy is the only service publishing host ports (80/443); `client` publishes none, so Caddy is the sole entry point in production.
+- For local dev, copy `docker-compose.override.yml.example` to `docker-compose.override.yml` (gitignored, auto-merged by `docker compose up`), which publishes `client` on `localhost:8080`. Caddy can't get a certificate from localhost; run `docker compose up --build api client` to skip it entirely.
 - `AllowedHosts` is wired as an environment variable override in `docker-compose.yml` (`ALLOWED_HOSTS`, defaulting to `*`) so the real deploy domain can be set via a `.env` file without a code change.
 - `appsettings.Production.json` quiets logging for `ASPNETCORE_ENVIRONMENT=Production`; note `dotnet run` applies `Properties/launchSettings.json`'s `ASPNETCORE_ENVIRONMENT=Development` regardless of shell env vars unless you pass `--no-launch-profile`.
 - `scripts/backup-db.sh` takes a manual point-in-time snapshot of the live SQLite volume via `sqlite3 .backup` (not a raw file copy — WAL-mode SQLite needs a real backup call, and the volume must be mounted read-write, not read-only, for that to work). No automated/scheduled backup exists yet.
@@ -108,4 +109,4 @@ dotnet ef database update
 
 - Backend: .NET 10 / ASP.NET Core Minimal APIs, EF Core 10 with SQLite, xUnit
 - Frontend: React 19 + TypeScript, Vite 8, oxlint, Tailwind CSS v4
-- Infra: Docker (separate Dockerfiles for API and client), nginx reverse proxy, Docker Compose with a named volume for the SQLite database
+- Infra: Docker (separate Dockerfiles for API and client), nginx reverse proxy, Caddy for HTTPS, Docker Compose with a named volume for the SQLite database, GitHub Actions CI (`.github/workflows/ci.yml`: API build/test, client lint/build)
