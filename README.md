@@ -8,7 +8,7 @@ ShoeTracker is a small web app for runners to track mileage on their running sho
 
 - **Add, edit, and delete shoes** — record a name, brand, purchase date, and a retirement threshold (in km, defaults to 700 km); deleting a shoe cascades to its runs.
 - **Log, edit, and delete runs** — attach a date and distance (km) to a specific shoe, with a per-shoe run history view.
-- **Strava import** — connect a Strava account and import your run history (runs, trail runs and treadmill runs), with each run's type, race/ultra labels and start location (looked up on OpenStreetMap). Imported runs aren't assigned to a shoe yet.
+- **Strava import** — connect a Strava account and import your run history (runs, trail runs and treadmill runs), with each run's type, race/ultra labels and start location (looked up on OpenStreetMap). Your history import starts out unassigned. Pick a default shoe and every newly imported run goes to it; move any run to another shoe in one click, and sort out the rest from the "Unassigned runs" list.
 - **Shoe grid / dashboard** — every shoe as an expandable card showing its total accumulated distance and a status of `OK` or `Retire me!` once it crosses its threshold; expanding a card lazily loads its run history.
 - **Automatic mileage totals** — total distance and retirement status are computed server-side from the shoe's logged runs, not stored redundantly.
 - **Input validation** — required fields, positive distances/thresholds, and a rule preventing runs from being logged with a future date.
@@ -40,12 +40,14 @@ The app is a classic two-tier web application: a single-page React frontend that
 | `GET` | `/shoes/{id}` | Get a single shoe |
 | `POST` | `/shoes` | Create a shoe |
 | `PUT` | `/shoes/{id}` | Update a shoe |
-| `DELETE` | `/shoes/{id}` | Delete a shoe (cascades to its runs) |
+| `DELETE` | `/shoes/{id}` | Delete a shoe: its manual runs are deleted, its Strava runs become unassigned |
+| `PUT` | `/shoes/default` | Set the default shoe new Strava runs go to (`{ "shoeId": n }`, or `null` for none) |
 | `GET` | `/shoes/{shoeId}/runs` | List a shoe's runs, most recent first |
 | `POST` | `/shoes/{shoeId}/runs` | Log a run against a shoe |
 | `PUT` | `/shoes/{shoeId}/runs/{id}` | Update a run |
 | `DELETE` | `/shoes/{shoeId}/runs/{id}` | Delete a run |
 | `GET` | `/runs` | List all of the current user's runs, most recent first, including runs not assigned to a shoe. Optional filters: `?unassigned=true`, `?source=Manual\|Strava`, `?limit=N` |
+| `PUT` | `/runs/{id}/shoe` | Move any run to another shoe, or unassign it (`{ "shoeId": n }` or `null`) |
 | `GET` | `/strava/connect` | Start connecting Strava: redirects the browser to Strava's consent screen |
 | `GET` | `/strava/callback` | Strava's OAuth redirect target: stores the tokens, then redirects to `/?strava=<result>` |
 | `GET` | `/strava/status` | Whether Strava is available on the server and connected for the current user |

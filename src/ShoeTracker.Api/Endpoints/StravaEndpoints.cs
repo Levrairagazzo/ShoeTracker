@@ -84,7 +84,9 @@ public static class StravaEndpoints
             var userId = user.GetUserId();
             var connection = await tokens.GetConnectionAsync(userId);
             var importedRuns = await db.Runs.CountAsync(r => r.UserId == userId && r.Source == RunSource.Strava);
-            return Results.Ok(new StravaStatusResponse(options.Value.IsConfigured, connection is not null, connection?.AthleteName, importedRuns));
+            var unassignedRuns = await db.Runs.CountAsync(r => r.UserId == userId && r.ShoeId == null);
+            return Results.Ok(new StravaStatusResponse(
+                options.Value.IsConfigured, connection is not null, connection?.AthleteName, importedRuns, unassignedRuns));
         });
 
         group.MapPost("/import", async (ClaimsPrincipal user, StravaImporter importer, PlaceNameSignal placeNames, ILogger<StravaImporter> logger) =>

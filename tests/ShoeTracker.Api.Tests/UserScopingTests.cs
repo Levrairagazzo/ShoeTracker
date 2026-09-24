@@ -55,6 +55,28 @@ public class UserScopingTests : ApiTestBase
     }
 
     [Fact]
+    public async Task AnotherUsersRunOrShoe_CantBeUsedToMoveRuns()
+    {
+        var owner = await LoginAsync(OwnerEmail);
+        var other = await LoginAsync(OtherEmail);
+        var ownerShoe = await CreateShoeAsync(owner);
+        var otherShoe = await CreateShoeAsync(other);
+        var ownerRun = await LogRunAsync(owner, ownerShoe.Id, 10);
+        var otherRun = await LogRunAsync(other, otherShoe.Id, 20);
+
+        var moveOthersRun = await other.PutAsJsonAsync($"/runs/{ownerRun.Id}/shoe", new AssignRunRequest(otherShoe.Id));
+        var moveOntoOthersShoe = await other.PutAsJsonAsync($"/runs/{otherRun.Id}/shoe", new AssignRunRequest(ownerShoe.Id));
+        var defaultToOthersShoe = await other.PutAsJsonAsync("/shoes/default", new SetDefaultShoeRequest(ownerShoe.Id));
+
+        Assert.Equal(HttpStatusCode.NotFound, moveOthersRun.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, moveOntoOthersShoe.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, defaultToOthersShoe.StatusCode);
+        Assert.Equal(10, (await owner.GetFromJsonAsync<ShoeResponse>($"/shoes/{ownerShoe.Id}"))!.TotalDistanceKm);
+        Assert.Equal(20, (await other.GetFromJsonAsync<ShoeResponse>($"/shoes/{otherShoe.Id}"))!.TotalDistanceKm);
+        Assert.False((await owner.GetFromJsonAsync<ShoeResponse>($"/shoes/{ownerShoe.Id}"))!.IsDefault);
+    }
+
+    [Fact]
     public async Task ListAllRuns_OnlyReturnsCurrentUsersRuns_IncludingUnassigned()
     {
         var owner = await LoginAsync(OwnerEmail);

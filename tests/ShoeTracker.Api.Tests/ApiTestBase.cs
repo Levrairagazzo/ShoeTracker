@@ -143,6 +143,37 @@ public abstract class ApiTestBase : IDisposable
             "read,activity:read_all");
     }
 
+    /// <summary>
+    /// Inserts a Strava-imported run straight into the DB, optionally already assigned to a shoe.
+    /// </summary>
+    protected int AddStravaRun(string email, double distanceKm, int? shoeId = null, long? activityId = null)
+    {
+        var id = 0;
+        WithDb(db =>
+        {
+            var run = new Run
+            {
+                UserId = db.Users.Single(u => u.Email == email).Id,
+                ShoeId = shoeId,
+                Date = new DateOnly(2026, 1, 2),
+                DistanceKm = distanceKm,
+                Source = RunSource.Strava,
+                StravaActivityId = activityId ?? Random.Shared.NextInt64(1, long.MaxValue),
+                Type = RunType.Run
+            };
+            db.Runs.Add(run);
+            db.SaveChanges();
+            id = run.Id;
+        });
+        return id;
+    }
+
+    protected static async Task SetDefaultShoeAsync(HttpClient client, int? shoeId)
+    {
+        var response = await client.PutAsJsonAsync("/shoes/default", new SetDefaultShoeRequest(shoeId));
+        response.EnsureSuccessStatusCode();
+    }
+
     /// <summary>Returns the field names in a ValidationProblem response's <c>errors</c> object.</summary>
     protected static async Task<IReadOnlyList<string>> ValidationErrorFieldsAsync(HttpResponseMessage response)
     {

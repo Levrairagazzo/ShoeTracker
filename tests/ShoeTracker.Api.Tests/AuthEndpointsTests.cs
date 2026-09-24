@@ -70,6 +70,8 @@ public class AuthEndpointsTests : ApiTestBase
     [InlineData("DELETE", "/shoes/1")]
     [InlineData("GET", "/shoes/1/runs")]
     [InlineData("GET", "/runs")]
+    [InlineData("PUT", "/runs/1/shoe")]
+    [InlineData("PUT", "/shoes/default")]
     [InlineData("GET", "/strava/connect")]
     [InlineData("GET", "/strava/callback")]
     [InlineData("GET", "/strava/status")]

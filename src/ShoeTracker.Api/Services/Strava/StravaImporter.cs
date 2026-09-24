@@ -5,8 +5,9 @@ using ShoeTracker.Api.Models;
 namespace ShoeTracker.Api.Services.Strava;
 
 /// <summary>
-/// Imports a user's Strava runs as unassigned <see cref="Run"/>s. Safe to re-run: activities
-/// already imported (by <see cref="Run.StravaActivityId"/>) are updated in place, not duplicated.
+/// Imports a user's Strava runs as <see cref="Run"/>s. Safe to re-run: activities already
+/// imported (by <see cref="Run.StravaActivityId"/>) are updated in place, not duplicated, and
+/// keep whatever shoe they've been assigned to.
 /// </summary>
 public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTokenStore tokens)
 {
@@ -29,6 +30,13 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
 
         var after = IncrementalStart(existing.Values);
 
+        // The first import is the user's history, which stays unassigned (E2 estimates it);
+        // runs arriving after that are new and go to the default shoe, if one is set.
+        var isFirstImport = existing.Count == 0;
+        var shoeForNewRuns = isFirstImport
+            ? null
+            : await db.Users.Where(u => u.Id == userId).Select(u => u.DefaultShoeId).SingleAsync(ct);
+
         var imported = 0;
         for (var page = 1; ; page++)
         {
@@ -40,7 +48,7 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
 
                 if (!existing.TryGetValue(activity.Id, out var run))
                 {
-                    run = new Run { UserId = userId, ShoeId = null, Source = RunSource.Strava, StravaActivityId = activity.Id };
+                    run = new Run { UserId = userId, ShoeId = shoeForNewRuns, Source = RunSource.Strava, StravaActivityId = activity.Id };
                     db.Runs.Add(run);
                     existing[activity.Id] = run;
                     imported++;

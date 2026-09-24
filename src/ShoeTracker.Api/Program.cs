@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Endpoints;
-using ShoeTracker.Api.Models;
 using ShoeTracker.Api.Services;
 using ShoeTracker.Api.Services.Geocoding;
 using ShoeTracker.Api.Services.Strava;
@@ -83,8 +82,10 @@ using (var scope = app.Services.CreateScope())
         var seedPassword = builder.Configuration["SeedAdminPassword"];
         if (!string.IsNullOrWhiteSpace(seedEmail) && !string.IsNullOrWhiteSpace(seedPassword))
         {
-            db.Users.Add(new User { Email = seedEmail, PasswordHash = PasswordHasher.Hash(seedPassword) });
-            db.SaveChanges();
+            // Plain SQL on purpose: on a fresh or old database this runs with the schema only at
+            // AddUsers, so inserting through the EF model would also write columns later
+            // migrations add to Users (e.g. DefaultShoeId) and fail.
+            db.Database.ExecuteSql($"INSERT INTO Users (Email, PasswordHash) VALUES ({seedEmail}, {PasswordHasher.Hash(seedPassword)})");
             app.Logger.LogInformation("Seeded initial admin user {Email}.", seedEmail);
         }
         else

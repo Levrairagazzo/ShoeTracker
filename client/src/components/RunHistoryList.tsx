@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ApiError, shoeTrackerClient } from '../api/shoeTrackerClient'
-import type { Run } from '../api/types'
+import type { Run, Shoe } from '../api/types'
+import { MoveRunSelect } from './MoveRunSelect'
 
 interface RunHistoryListProps {
   shoeId: number
+  shoes: Shoe[]
+  /** The list reloads when this changes, e.g. the shoe's total after a run moves in from elsewhere. */
+  reloadKey: unknown
   onChanged: () => void
 }
 
@@ -20,13 +24,14 @@ function formatDate(date: string) {
 
 interface RunRowProps {
   shoeId: number
+  shoes: Shoe[]
   run: Run
   onChanged: () => void
   onUpdated: (run: Run) => void
   onDeleted: () => void
 }
 
-function RunRow({ shoeId, run, onChanged, onUpdated, onDeleted }: RunRowProps) {
+function RunRow({ shoeId, shoes, run, onChanged, onUpdated, onDeleted }: RunRowProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [date, setDate] = useState(run.date)
@@ -48,7 +53,9 @@ function RunRow({ shoeId, run, onChanged, onUpdated, onDeleted }: RunRowProps) {
       setIsEditing(false)
     } catch (err) {
       if (err instanceof ApiError) {
-        const messages = err.problem ? Object.values(err.problem.errors).flat() : [err.message]
+        const messages = err.problem?.errors
+          ? Object.values(err.problem.errors).flat()
+          : [err.problem?.detail ?? err.message]
         setError(messages.join(' '))
       } else {
         setError('Something went wrong updating this run.')
@@ -67,6 +74,12 @@ function RunRow({ shoeId, run, onChanged, onUpdated, onDeleted }: RunRowProps) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function handleMoved(moved: Run) {
+    // Moved to another shoe (or unassigned): it no longer belongs in this shoe's list.
+    if (moved.shoeId !== shoeId) onDeleted()
+    onChanged()
   }
 
   if (isEditing) {
@@ -134,8 +147,15 @@ function RunRow({ shoeId, run, onChanged, onUpdated, onDeleted }: RunRowProps) {
             Cancel
           </button>
         </div>
+      ) : run.source === 'Strava' ? (
+        // Strava owns its runs' date and distance; only the shoe can change here.
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text">Strava</span>
+          <MoveRunSelect run={run} shoes={shoes} onMoved={handleMoved} />
+        </div>
       ) : (
         <div className="flex items-center gap-1">
+          <MoveRunSelect run={run} shoes={shoes} onMoved={handleMoved} />
           <button
             type="button"
             onClick={() => setIsEditing(true)}
@@ -156,7 +176,7 @@ function RunRow({ shoeId, run, onChanged, onUpdated, onDeleted }: RunRowProps) {
   )
 }
 
-export function RunHistoryList({ shoeId, onChanged }: RunHistoryListProps) {
+export function RunHistoryList({ shoeId, shoes, reloadKey, onChanged }: RunHistoryListProps) {
   const [runs, setRuns] = useState<Run[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -175,7 +195,7 @@ export function RunHistoryList({ shoeId, onChanged }: RunHistoryListProps) {
     return () => {
       cancelled = true
     }
-  }, [shoeId])
+  }, [shoeId, reloadKey])
 
   if (error) {
     return <p className="text-sm text-red-600">{error}</p>
@@ -195,6 +215,7 @@ export function RunHistoryList({ shoeId, onChanged }: RunHistoryListProps) {
         <RunRow
           key={run.id}
           shoeId={shoeId}
+          shoes={shoes}
           run={run}
           onChanged={onChanged}
           onUpdated={(updated) =>

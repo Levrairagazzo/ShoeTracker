@@ -150,6 +150,60 @@ public class StravaImportTests : ApiTestBase
     }
 
     [Fact]
+    public async Task FirstImport_LeavesHistoryUnassigned_EvenWithADefaultShoe()
+    {
+        var client = await LoginAsync();
+        var shoe = await CreateShoeAsync(client);
+        await SetDefaultShoeAsync(client, shoe.Id);
+        await ConnectStravaAsync(OwnerEmail);
+        ServeActivities([FakeHttpHandler.Activity(1, 5_000, "2026-03-01T07:00:00Z")]);
+
+        await ImportAsync(client);
+
+        Assert.Null(Assert.Single(StravaRuns()).ShoeId);
+    }
+
+    [Fact]
+    public async Task LaterImports_AssignNewRunsToTheDefaultShoe_AndKeepExistingAssignments()
+    {
+        var client = await LoginAsync();
+        var defaultShoe = await CreateShoeAsync(client);
+        var otherShoe = await CreateShoeAsync(client);
+        await ConnectStravaAsync(OwnerEmail);
+        ServeActivities([
+            FakeHttpHandler.Activity(1, 5_000, "2026-03-01T07:00:00Z"),
+            FakeHttpHandler.Activity(2, 6_000, "2026-03-02T07:00:00Z"),
+        ]);
+        await ImportAsync(client);
+        var history = StravaRuns();
+        await client.PutAsJsonAsync($"/runs/{history[1].Id}/shoe", new AssignRunRequest(otherShoe.Id));
+        await SetDefaultShoeAsync(client, defaultShoe.Id);
+        ServeActivities([
+            FakeHttpHandler.Activity(2, 6_000, "2026-03-02T07:00:00Z"),
+            FakeHttpHandler.Activity(3, 7_000, "2026-03-03T07:00:00Z"),
+        ]);
+
+        await ImportAsync(client);
+
+        var runs = StravaRuns();
+        Assert.Equal([null, otherShoe.Id, defaultShoe.Id], runs.Select(r => r.ShoeId));
+    }
+
+    [Fact]
+    public async Task LaterImports_WithoutADefaultShoe_LeaveNewRunsUnassigned()
+    {
+        var client = await LoginAsync();
+        await ConnectStravaAsync(OwnerEmail);
+        ServeActivities([FakeHttpHandler.Activity(1, 5_000, "2026-03-01T07:00:00Z")]);
+        await ImportAsync(client);
+        ServeActivities([FakeHttpHandler.Activity(2, 5_000, "2026-03-02T07:00:00Z")]);
+
+        await ImportAsync(client);
+
+        Assert.All(StravaRuns(), r => Assert.Null(r.ShoeId));
+    }
+
+    [Fact]
     public async Task Import_PagesThroughTheWholeHistory()
     {
         var client = await LoginAsync();
