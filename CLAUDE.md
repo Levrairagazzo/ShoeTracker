@@ -79,9 +79,10 @@ npm run build     # tsc -b && vite build
 npm run lint       # oxlint
 ```
 
-**Back up the live database** (from repo root, requires the app running via `docker compose`):
+**Back up / restore the live database** (from repo root, via `docker compose`):
 ```bash
-./scripts/backup-db.sh
+./scripts/backup-db.sh                          # one-off manual snapshot, never pruned
+./scripts/restore-db.sh backups/<file>.db       # restore (takes a safety snapshot first)
 ```
 
 **EF Core migrations** (from `src/ShoeTracker.Api/`) — `dotnet-ef` is a local tool pinned in `dotnet-tools.json`; run `dotnet tool restore` once if it's not on PATH:
@@ -99,7 +100,7 @@ dotnet ef database update
 - For local dev, copy `docker-compose.override.yml.example` to `docker-compose.override.yml` (gitignored, auto-merged by `docker compose up`), which publishes `client` on `localhost:8080`. Caddy can't get a certificate from localhost; run `docker compose up --build api client` to skip it entirely.
 - `AllowedHosts` is wired as an environment variable override in `docker-compose.yml` (`ALLOWED_HOSTS`, defaulting to `*`) so the real deploy domain can be set via a `.env` file without a code change.
 - `appsettings.Production.json` quiets logging for `ASPNETCORE_ENVIRONMENT=Production`; note `dotnet run` applies `Properties/launchSettings.json`'s `ASPNETCORE_ENVIRONMENT=Development` regardless of shell env vars unless you pass `--no-launch-profile`.
-- `scripts/backup-db.sh` takes a manual point-in-time snapshot of the live SQLite volume via `sqlite3 .backup` (not a raw file copy — WAL-mode SQLite needs a real backup call, and the volume must be mounted read-write, not read-only, for that to work). No automated/scheduled backup exists yet.
+- Backups: the `backup` service (`backup/Dockerfile` + `backup/backup.sh`, Alpine + sqlite3) snapshots the live DB into `./backups` on start and every `BACKUP_INTERVAL_HOURS` (default 24), integrity-checks each snapshot, and keeps the newest `BACKUP_KEEP` (default 14) `shoetracker-auto-*.db` files. `scripts/backup-db.sh` runs the same image in `once` mode to write a manual `shoetracker-*.db` snapshot, which retention never prunes. `scripts/restore-db.sh` integrity-checks a backup, takes a safety snapshot, stops `api`/`backup`, swaps the file into the volume (deleting the old `-wal`/`-shm`), and restarts them. Two things matter here. First, snapshots use `sqlite3 .backup`, not a file copy, and the volume must be mounted read-write because WAL-mode SQLite has to touch its sidecar files even to read. Second, `backup.sh` runs sqlite3 as the DB file's owner (the API's non-root `app` user, uid 1654) via `su-exec`; running as root could leave root-owned `-wal`/`-shm` files that the API can't write. Backups are same-host only, with no off-site copy.
 
 ## Branches
 
