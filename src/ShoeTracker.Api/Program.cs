@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -6,6 +7,8 @@ using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Endpoints;
 using ShoeTracker.Api.Models;
 using ShoeTracker.Api.Services;
+using ShoeTracker.Api.Services.Geocoding;
+using ShoeTracker.Api.Services.Strava;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +39,30 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         };
     });
 builder.Services.AddAuthorization();
+
+// Protects the auth cookie and the stored Strava tokens. In Docker the key ring lives on the
+// data volume (DataProtection__KeysPath), so sessions and tokens survive container rebuilds.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("ShoeTracker");
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(keysPath))
+{
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+}
+
+builder.Services.Configure<StravaOptions>(builder.Configuration.GetSection(StravaOptions.SectionName));
+builder.Services.AddHttpClient<StravaClient>(client => client.BaseAddress = StravaClient.BaseAddress);
+builder.Services.AddScoped<StravaTokenStore>();
+builder.Services.AddScoped<StravaImporter>();
+
+builder.Services.Configure<GeocodingOptions>(builder.Configuration.GetSection(GeocodingOptions.SectionName));
+builder.Services.AddHttpClient<NominatimClient>(client =>
+{
+    client.BaseAddress = NominatimClient.BaseAddress;
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(NominatimClient.UserAgent);
+});
+builder.Services.AddScoped<PlaceNameResolver>();
+builder.Services.AddSingleton<PlaceNameSignal>();
+builder.Services.AddHostedService<PlaceNameBackgroundService>();
 
 var app = builder.Build();
 
@@ -75,5 +102,6 @@ app.UseAuthorization();
 app.MapShoeEndpoints();
 app.MapRunEndpoints();
 app.MapAuthEndpoints();
+app.MapStravaEndpoints();
 
 app.Run();

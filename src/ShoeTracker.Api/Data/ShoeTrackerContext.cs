@@ -11,6 +11,10 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<StravaConnection> StravaConnections => Set<StravaConnection>();
+
+    public DbSet<PlaceName> PlaceNames => Set<PlaceName>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Shoe>()
@@ -27,6 +31,34 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
             .HasMany<Shoe>()
             .WithOne(s => s.User)
             .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasMany<Run>()
+            .WithOne(r => r.User)
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Run>()
+            .Property(r => r.Source)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<Run>()
+            .HasIndex(r => new { r.UserId, r.StravaActivityId })
+            .IsUnique();
+
+        modelBuilder.Entity<Run>()
+            .Property(r => r.Type)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<PlaceName>()
+            .HasIndex(p => p.AreaKey)
+            .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasOne<StravaConnection>()
+            .WithOne(c => c.User)
+            .HasForeignKey<StravaConnection>(c => c.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

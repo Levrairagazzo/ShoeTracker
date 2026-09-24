@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShoeTracker.Api.Data;
 
@@ -10,34 +11,14 @@ using ShoeTracker.Api.Data;
 namespace ShoeTracker.Api.Migrations
 {
     [DbContext(typeof(ShoeTrackerContext))]
-    partial class ShoeTrackerContextModelSnapshot : ModelSnapshot
+    [Migration("20260924191745_AddStravaConnections")]
+    partial class AddStravaConnections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
-
-            modelBuilder.Entity("ShoeTracker.Api.Models.PlaceName", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("AreaKey")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AreaKey")
-                        .IsUnique();
-
-                    b.ToTable("PlaceNames");
-                });
 
             modelBuilder.Entity("ShoeTracker.Api.Models.Run", b =>
                 {
@@ -51,9 +32,6 @@ namespace ShoeTracker.Api.Migrations
                     b.Property<double>("DistanceKm")
                         .HasColumnType("REAL");
 
-                    b.Property<bool>("IsRace")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int?>("ShoeId")
                         .HasColumnType("INTEGER");
 
@@ -61,17 +39,8 @@ namespace ShoeTracker.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<double?>("StartLatitude")
-                        .HasColumnType("REAL");
-
-                    b.Property<double?>("StartLongitude")
-                        .HasColumnType("REAL");
-
                     b.Property<long?>("StravaActivityId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Type")
-                        .HasColumnType("TEXT");
 
                     b.Property<int>("UserId")
                         .HasColumnType("INTEGER");

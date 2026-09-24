@@ -13,8 +13,21 @@ export interface Run {
   id: number
   date: string
   distanceKm: number
-  shoeId: number
+  /** null while the run isn't assigned to a shoe (e.g. an imported Strava run) */
+  shoeId: number | null
+  source: RunSource
+  /** null for manual runs */
+  type: RunType | null
+  isRace: boolean
+  /** longer than a marathon */
+  isUltra: boolean
+  /** where the run started, e.g. "Oakland, California"; null if unknown or not looked up yet */
+  location: string | null
 }
+
+export type RunSource = 'Manual' | 'Strava'
+
+export type RunType = 'Run' | 'Trail' | 'Treadmill'
 
 export interface CreateShoeRequest {
   name: string
@@ -30,6 +43,8 @@ export interface CreateRunRequest {
 
 export interface ValidationProblem {
   title: string
+  /** human-readable explanation, set on non-validation problems */
+  detail?: string
   status: number
   errors: Record<string, string[]>
 }
@@ -37,6 +52,19 @@ export interface ValidationProblem {
 export interface CurrentUser {
   id: number
   email: string
+}
+
+export interface StravaStatus {
+  /** false when the server has no Strava API credentials configured */
+  available: boolean
+  connected: boolean
+  athleteName: string | null
+  /** how many of the user's runs came from Strava */
+  importedRuns: number
+}
+
+export interface StravaImportResult {
+  imported: number
 }
 
 export interface LoginRequest {
