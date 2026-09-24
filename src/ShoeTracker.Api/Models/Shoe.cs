@@ -14,5 +14,9 @@ public class Shoe
 
     public bool IsRetired { get; set; }
 
+    public int UserId { get; set; }
+
+    public User? User { get; set; }
+
     public List<Run> Runs { get; set; } = [];
 }

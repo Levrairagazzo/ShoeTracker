@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Dtos;
@@ -12,7 +13,7 @@ public static class ShoeEndpoints
     {
         var group = app.MapGroup("/shoes").RequireAuthorization();
 
-        group.MapPost("/", async (CreateShoeRequest request, ShoeTrackerContext db) =>
+        group.MapPost("/", async (CreateShoeRequest request, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
             var thresholdKm = request.ThresholdKm ?? 700;
             var validation = ValidateShoe(request.Name, request.Brand, thresholdKm);
@@ -23,7 +24,8 @@ public static class ShoeEndpoints
                 Name = request.Name,
                 Brand = request.Brand,
                 PurchaseDate = request.PurchaseDate,
-                ThresholdKm = thresholdKm
+                ThresholdKm = thresholdKm,
+                UserId = user.GetUserId()
             };
 
             db.Shoes.Add(shoe);
@@ -32,25 +34,28 @@ public static class ShoeEndpoints
             return Results.Created($"/shoes/{shoe.Id}", ToResponse(shoe));
         });
 
-        group.MapGet("/", async (ShoeTrackerContext db) =>
+        group.MapGet("/", async (ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
-            var shoes = await db.Shoes.Include(s => s.Runs).ToListAsync();
+            var userId = user.GetUserId();
+            var shoes = await db.Shoes.Include(s => s.Runs).Where(s => s.UserId == userId).ToListAsync();
             return Results.Ok(shoes.Select(ToResponse));
         });
 
-        group.MapGet("/{id:int}", async (int id, ShoeTrackerContext db) =>
+        group.MapGet("/{id:int}", async (int id, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
-            var shoe = await db.Shoes.Include(s => s.Runs).FirstOrDefaultAsync(s => s.Id == id);
+            var userId = user.GetUserId();
+            var shoe = await db.Shoes.Include(s => s.Runs).FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
             return shoe is null ? Results.NotFound() : Results.Ok(ToResponse(shoe));
         });
 
-        group.MapPut("/{id:int}", async (int id, CreateShoeRequest request, ShoeTrackerContext db) =>
+        group.MapPut("/{id:int}", async (int id, CreateShoeRequest request, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
             var thresholdKm = request.ThresholdKm ?? 700;
             var validation = ValidateShoe(request.Name, request.Brand, thresholdKm);
             if (validation is not null) return validation;
 
-            var shoe = await db.Shoes.Include(s => s.Runs).FirstOrDefaultAsync(s => s.Id == id);
+            var userId = user.GetUserId();
+            var shoe = await db.Shoes.Include(s => s.Runs).FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
             if (shoe is null) return Results.NotFound();
 
             shoe.Name = request.Name;
@@ -63,9 +68,10 @@ public static class ShoeEndpoints
             return Results.Ok(ToResponse(shoe));
         });
 
-        group.MapDelete("/{id:int}", async (int id, ShoeTrackerContext db) =>
+        group.MapDelete("/{id:int}", async (int id, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
-            var shoe = await db.Shoes.FindAsync(id);
+            var userId = user.GetUserId();
+            var shoe = await db.Shoes.FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
             if (shoe is null) return Results.NotFound();
 
             db.Shoes.Remove(shoe);

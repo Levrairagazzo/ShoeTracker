@@ -46,9 +46,8 @@ public static class AuthEndpoints
 
         group.MapGet("/me", (ClaimsPrincipal principal) =>
         {
-            var id = int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var email = principal.FindFirstValue(ClaimTypes.Email)!;
-            return Results.Ok(new UserResponse(id, email));
+            return Results.Ok(new UserResponse(principal.GetUserId(), email));
         }).RequireAuthorization();
     }
 

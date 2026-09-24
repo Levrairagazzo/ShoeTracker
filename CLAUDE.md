@@ -13,10 +13,10 @@ Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core min
 **API** (`src/ShoeTracker.Api/`):
 - Minimal API, no MVC controllers. Endpoints are grouped by resource in `Endpoints/ShoeEndpoints.cs`, `Endpoints/RunEndpoints.cs` and `Endpoints/AuthEndpoints.cs`, registered via extension methods (`MapShoeEndpoints`, `MapRunEndpoints`, `MapAuthEndpoints`) called from `Program.cs`.
 - Request/response shapes are plain C# records in `Dtos/`.
-- Domain entities (`Models/Shoe.cs`, `Models/Run.cs`) are persisted via EF Core (`Data/ShoeTrackerContext.cs`); one shoe has many runs.
+- Domain entities (`Models/User.cs`, `Models/Shoe.cs`, `Models/Run.cs`) are persisted via EF Core (`Data/ShoeTrackerContext.cs`); one user has many shoes, one shoe has many runs (both cascade on delete). Runs have no `UserId` of their own — ownership is always derived through `Run.Shoe.UserId`.
 - Mileage math (total distance, over-threshold check) lives in `Services/MileageCalculator.cs`, deliberately kept out of endpoint handlers so it's independently unit-testable — this is the pattern to follow for any new business logic.
 - Validation (required fields, positive distance/threshold, no future-dated runs) happens inline in the endpoint handlers via `Results.ValidationProblem`, not via data annotations or a separate validation layer.
-- On startup, `Program.cs` runs `db.Database.Migrate()`, so the schema is always brought up to date automatically — no manual migration step needed when running the API.
+- On startup, `Program.cs` migrates the database automatically — no manual migration step needed when running the API. Migration is staged around the admin seed step: a database that hasn't yet applied `AddShoeOwnership` is migrated only to `AddUsers`, the admin account is seeded, then the remaining migrations run. This is because `AddShoeOwnership` backfills pre-existing shoes to the lowest-Id user, so that user must exist first.
 - Connection string / DB file path is configured in `appsettings.json` (`ConnectionStrings:ShoeTrackerContext`, SQLite file `shoetracker.db`). In Docker the SQLite file lives on a named volume (`shoe-data`) so data survives restarts.
 
 **Client** (`client/src/`):
@@ -42,7 +42,7 @@ Two-tier app: a React SPA (`client/`) talks over `/api/*` to an ASP.NET Core min
 | `POST` | `/auth/logout` | Log out, clears the session (requires an active session) |
 | `GET` | `/auth/me` | Get the current logged-in user (requires an active session) |
 
-Note: `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active app-level login session (`.RequireAuthorization()`) but are not yet scoped per-user (see "Deployment & auth" below) — that scoping is planned for a later step.
+Note: `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active app-level login session (`.RequireAuthorization()`) and are scoped to the logged-in user: every query filters on the current user's id (`ClaimsPrincipal.GetUserId()` in `Endpoints/ClaimsPrincipalExtensions.cs`, read from the cookie's `NameIdentifier` claim). Another user's shoe or run returns `404`, not `403`, so its existence isn't revealed. Any new endpoint touching shoes/runs must apply the same filter — `UserScopingTests` covers every existing endpoint.
 
 Validation logic shared between create/update is factored into a private `Validate...` helper in each endpoint file — follow that pattern rather than duplicating the checks inline when adding new mutating endpoints.
 
@@ -64,7 +64,7 @@ npm run dev
 docker compose up --build
 ```
 
-**Run tests** (from `tests/ShoeTracker.Api.Tests/`):
+**Run tests** (from `tests/ShoeTracker.Api.Tests/`) — unit tests for services, plus `WebApplicationFactory`-based integration tests (e.g. `UserScopingTests`) that run the real API against a throwaway SQLite file:
 ```bash
 dotnet test
 ```
@@ -92,7 +92,7 @@ dotnet ef database update
 
 ## Deployment & auth
 
-- The app has a single application-level user account (email + PBKDF2-hashed password, in a `Users` table via `Services/PasswordHasher.cs`) — there's no self-serve sign-up. The one account is created by a startup seed step in `Program.cs`: if no `User` row exists yet, it reads `SeedAdminEmail`/`SeedAdminPassword` from configuration and creates the account (idempotent — re-runs are a no-op once the account exists, so leaving the env vars set permanently is safe). `POST /auth/login` establishes an ASP.NET Core cookie-based session (14-day sliding expiration); `GET /auth/me` / `POST /auth/logout` round out the session lifecycle. This app-level login is a separate, *inner* layer. `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active login session (`.RequireAuthorization()`) but are not yet scoped to the specific logged-in user's data (planned for a later step).
+- The app has a single application-level user account (email + PBKDF2-hashed password, in a `Users` table via `Services/PasswordHasher.cs`) — there's no self-serve sign-up. The one account is created by a startup seed step in `Program.cs`: if no `User` row exists yet, it reads `SeedAdminEmail`/`SeedAdminPassword` from configuration and creates the account (idempotent — re-runs are a no-op once the account exists, so leaving the env vars set permanently is safe). `POST /auth/login` establishes an ASP.NET Core cookie-based session (14-day sliding expiration); `GET /auth/me` / `POST /auth/logout` round out the session lifecycle. `/shoes` and `/shoes/{shoeId}/runs` endpoints require an active login session and only ever expose the logged-in user's own data (see the note under "API endpoints"). Additional accounts can only be added directly in the `Users` table for now.
 - For local dev, set the seed credentials via `dotnet user-secrets set "SeedAdminEmail" "..."` / `"SeedAdminPassword" "..."` from `src/ShoeTracker.Api/` (or shell env vars) — never put real credentials in `appsettings.Development.json`, which is committed to git.
 - The static SPA has no outer HTTP Basic Auth gate — `client/nginx.conf` serves it directly. The app-level cookie session described above is the only auth layer; nginx just serves the built client and reverse-proxies `/api/*` to the API container.
 - TLS is terminated by the `caddy` service in `docker-compose.yml`, configured by the root `Caddyfile` (domain `milesleft.run`, HSTS header, automatic Let's Encrypt certificates, reverse-proxying to `client:80`). nginx only ever speaks plain HTTP. Caddy is the only service publishing host ports (80/443); `client` publishes none, so Caddy is the sole entry point in production.
