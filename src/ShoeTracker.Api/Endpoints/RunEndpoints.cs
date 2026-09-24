@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Dtos;
@@ -9,12 +10,13 @@ public static class RunEndpoints
 {
     public static void MapRunEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/shoes/{shoeId:int}/runs", async (int shoeId, CreateRunRequest request, ShoeTrackerContext db) =>
+        app.MapPost("/shoes/{shoeId:int}/runs", async (int shoeId, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
             var validation = ValidateRun(request.Date, request.DistanceKm);
             if (validation is not null) return validation;
 
-            var shoeExists = await db.Shoes.AnyAsync(s => s.Id == shoeId);
+            var userId = user.GetUserId();
+            var shoeExists = await db.Shoes.AnyAsync(s => s.Id == shoeId && s.UserId == userId);
             if (!shoeExists)
             {
                 return Results.NotFound();
@@ -33,9 +35,10 @@ public static class RunEndpoints
             return Results.Created($"/shoes/{shoeId}/runs/{run.Id}", ToResponse(run));
         }).RequireAuthorization();
 
-        app.MapGet("/shoes/{shoeId:int}/runs", async (int shoeId, ShoeTrackerContext db) =>
+        app.MapGet("/shoes/{shoeId:int}/runs", async (int shoeId, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
-            var shoeExists = await db.Shoes.AnyAsync(s => s.Id == shoeId);
+            var userId = user.GetUserId();
+            var shoeExists = await db.Shoes.AnyAsync(s => s.Id == shoeId && s.UserId == userId);
             if (!shoeExists)
             {
                 return Results.NotFound();
@@ -50,12 +53,13 @@ public static class RunEndpoints
             return Results.Ok(runs.Select(ToResponse));
         }).RequireAuthorization();
 
-        app.MapPut("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, CreateRunRequest request, ShoeTrackerContext db) =>
+        app.MapPut("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
             var validation = ValidateRun(request.Date, request.DistanceKm);
             if (validation is not null) return validation;
 
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId);
+            var userId = user.GetUserId();
+            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.Shoe!.UserId == userId);
             if (run is null) return Results.NotFound();
 
             run.Date = request.Date;
@@ -66,9 +70,10 @@ public static class RunEndpoints
             return Results.Ok(ToResponse(run));
         }).RequireAuthorization();
 
-        app.MapDelete("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, ShoeTrackerContext db) =>
+        app.MapDelete("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, ShoeTrackerContext db, ClaimsPrincipal user) =>
         {
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId);
+            var userId = user.GetUserId();
+            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.Shoe!.UserId == userId);
             if (run is null) return Results.NotFound();
 
             db.Runs.Remove(run);

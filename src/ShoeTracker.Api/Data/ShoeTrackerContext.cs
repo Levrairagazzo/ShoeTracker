@@ -22,5 +22,11 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
             .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasMany<Shoe>()
+            .WithOne(s => s.User)
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
