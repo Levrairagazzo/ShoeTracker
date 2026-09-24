@@ -16,8 +16,8 @@ public class StravaEndpointsTests : ApiTestBase
         Strava.Respond = request => request.Path switch
         {
             "/oauth/token" when request.Form["grant_type"] == "authorization_code" =>
-                FakeStravaHandler.Json(FakeStravaHandler.TokenBody("access-1", "refresh-1", DateTimeOffset.UtcNow.AddHours(6))),
-            "/oauth/deauthorize" => FakeStravaHandler.Json(new { access_token = request.Form["access_token"] }),
+                FakeHttpHandler.Json(FakeHttpHandler.TokenBody("access-1", "refresh-1", DateTimeOffset.UtcNow.AddHours(6))),
+            "/oauth/deauthorize" => FakeHttpHandler.Json(new { access_token = request.Form["access_token"] }),
             _ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
         };
     }
@@ -75,7 +75,7 @@ public class StravaEndpointsTests : ApiTestBase
         Assert.Equal(StravaClientSecret, exchange.Form["client_secret"]);
 
         var status = await client.GetFromJsonAsync<StravaStatusResponse>("/strava/status");
-        Assert.Equal(new StravaStatusResponse(true, true, "Test Runner"), status);
+        Assert.Equal(new StravaStatusResponse(true, true, "Test Runner", 0), status);
 
         WithDb(db =>
         {
@@ -157,7 +157,7 @@ public class StravaEndpointsTests : ApiTestBase
 
         var status = await client.GetFromJsonAsync<StravaStatusResponse>("/strava/status");
 
-        Assert.Equal(new StravaStatusResponse(true, false, null), status);
+        Assert.Equal(new StravaStatusResponse(true, false, null, 0), status);
     }
 
     [Fact]
@@ -232,7 +232,7 @@ public class StravaEndpointsTests : ApiTestBase
             db.SaveChanges();
         });
         Strava.Respond = request => request.Form.GetValueOrDefault("grant_type") == "refresh_token"
-            ? FakeStravaHandler.Json(FakeStravaHandler.TokenBody("access-2", "refresh-2", DateTimeOffset.UtcNow.AddHours(6), withAthlete: false))
+            ? FakeHttpHandler.Json(FakeHttpHandler.TokenBody("access-2", "refresh-2", DateTimeOffset.UtcNow.AddHours(6), withAthlete: false))
             : new HttpResponseMessage(HttpStatusCode.InternalServerError);
         var refreshed = await WithTokenStore(store => store.GetValidAccessTokenAsync(userId));
         var afterRefresh = await WithTokenStore(store => store.GetValidAccessTokenAsync(userId));

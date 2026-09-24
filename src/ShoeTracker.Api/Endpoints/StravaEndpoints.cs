@@ -1,8 +1,13 @@
 using System.Security.Claims;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Dtos;
+using ShoeTracker.Api.Models;
+using ShoeTracker.Api.Services.Geocoding;
 using ShoeTracker.Api.Services.Strava;
 
 namespace ShoeTracker.Api.Endpoints;
@@ -74,10 +79,40 @@ public static class StravaEndpoints
             return BackToApp("connected");
         });
 
-        group.MapGet("/status", async (ClaimsPrincipal user, StravaTokenStore tokens, IOptions<StravaOptions> options) =>
+        group.MapGet("/status", async (ClaimsPrincipal user, StravaTokenStore tokens, IOptions<StravaOptions> options, ShoeTrackerContext db) =>
         {
-            var connection = await tokens.GetConnectionAsync(user.GetUserId());
-            return Results.Ok(new StravaStatusResponse(options.Value.IsConfigured, connection is not null, connection?.AthleteName));
+            var userId = user.GetUserId();
+            var connection = await tokens.GetConnectionAsync(userId);
+            var importedRuns = await db.Runs.CountAsync(r => r.UserId == userId && r.Source == RunSource.Strava);
+            return Results.Ok(new StravaStatusResponse(options.Value.IsConfigured, connection is not null, connection?.AthleteName, importedRuns));
+        });
+
+        group.MapPost("/import", async (ClaimsPrincipal user, StravaImporter importer, PlaceNameSignal placeNames, ILogger<StravaImporter> logger) =>
+        {
+            try
+            {
+                var imported = await importer.ImportAsync(user.GetUserId());
+                // New start points may need naming; look them up in the background.
+                if (imported is not null) placeNames.Notify();
+                return imported is null
+                    ? Results.Problem("Strava isn't connected.", statusCode: StatusCodes.Status409Conflict)
+                    : Results.Ok(new StravaImportResponse(imported.Value));
+            }
+            catch (DbUpdateException)
+            {
+                // Another import for this user saved the same activities first (unique index).
+                return Results.Problem("Another Strava import is already running.", statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                return Results.Problem("Strava's rate limit was reached. Try again in 15 minutes.", statusCode: StatusCodes.Status429TooManyRequests);
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogWarning(ex, "Strava import failed.");
+                return Results.Problem("Strava couldn't be reached, or rejected the request. Try again, or disconnect and reconnect Strava.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
         });
 
         group.MapDelete("/connection", async (ClaimsPrincipal user, StravaClient strava, StravaTokenStore tokens, ILogger<StravaClient> logger) =>

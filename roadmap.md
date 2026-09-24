@@ -49,7 +49,8 @@ These apply across the epics:
 - **Before we start (me):** register a Strava API app at strava.com/settings/api. Callback domains are `milesleft.run`, plus `localhost` for dev. The client id and secret go in user-secrets locally and `.env` in prod, never in committed config.
 - A "Connect Strava" OAuth flow (scope `activity:read_all`), and a way to disconnect.
 - Tokens are stored per user, encrypted with ASP.NET Core Data Protection, and refreshed when they expire. The key ring lives on the `shoe-data` volume, and the backup/restore scripts include it. If the keys are ever lost, the fix is just reconnecting Strava. Persisting the key ring also means login sessions survive redeploys.
-- On connect, my full history is imported as **unassigned** runs. `Run`, `TrailRun` and `VirtualRun` (treadmill) all count as runs. Importing is incremental and idempotent, keyed on `StravaActivityId`.
+- On connect, my full history is imported as **unassigned** runs (the client starts the import; an "Import new runs" button re-runs it). Disconnecting keeps imported runs.
+- Each imported run records its type (Run / Trail / Treadmill), whether it was a race, and its start point. "Ultra" (longer than a marathon) is computed. Start points are named via OpenStreetMap (rounded ~1 km areas, cached). A "Latest imported runs" table shows the 10 most recent imports. Strava can't tell road from trail unless the activity was recorded as "Trail Run". `Run`, `TrailRun` and `VirtualRun` (treadmill) all count as runs. Importing is incremental and idempotent, keyed on `StravaActivityId`.
 - Rate limits (100 requests per 15 min, 1,000 per day) aren't a concern: 200 activities per page, so years of history is a handful of calls.
 
 **E1b — New runs flow in automatically**

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace ShoeTracker.Api.Services.Strava;
 
-/// <summary>Typed HttpClient for Strava's OAuth endpoints.</summary>
+/// <summary>Typed HttpClient for Strava's OAuth endpoints and the activities API.</summary>
 public class StravaClient(HttpClient http, IOptions<StravaOptions> options)
 {
     public static readonly Uri BaseAddress = new("https://www.strava.com/");
@@ -44,6 +44,20 @@ public class StravaClient(HttpClient http, IOptions<StravaOptions> options)
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>One page of the athlete's activities, newest first, optionally only those started after <paramref name="after"/>.</summary>
+    public async Task<IReadOnlyList<StravaActivity>> GetActivitiesAsync(
+        string accessToken, DateTimeOffset? after, int page, int perPage, CancellationToken ct = default)
+    {
+        var query = $"api/v3/athlete/activities?page={page}&per_page={perPage}";
+        if (after is { } since) query += $"&after={since.ToUnixTimeSeconds()}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, query);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        using var response = await http.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<List<StravaActivity>>(ct) ?? [];
+    }
+
     private async Task<StravaTokenResponse> PostTokenAsync(Dictionary<string, string> fields, CancellationToken ct)
     {
         fields["client_id"] = options.Value.ClientId!;
@@ -67,3 +81,18 @@ public record StravaAthlete(
     [property: JsonPropertyName("id")] long Id,
     [property: JsonPropertyName("firstname")] string? FirstName,
     [property: JsonPropertyName("lastname")] string? LastName);
+
+/// <param name="Distance">In metres.</param>
+/// <param name="StartDateLocal">Wall-clock start time where the activity happened (Strava marks it "Z", but it isn't UTC).</param>
+/// <param name="Trainer">Recorded indoors, e.g. a treadmill run logged as a plain "Run".</param>
+/// <param name="WorkoutType">For runs: 0 default, 1 race, 2 long run, 3 workout.</param>
+/// <param name="StartLatLng">[latitude, longitude], or empty for activities without GPS.</param>
+public record StravaActivity(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("sport_type")] string? SportType,
+    [property: JsonPropertyName("distance")] double Distance,
+    [property: JsonPropertyName("start_date_local")] DateTime StartDateLocal,
+    [property: JsonPropertyName("trainer")] bool Trainer = false,
+    [property: JsonPropertyName("workout_type")] int? WorkoutType = null,
+    [property: JsonPropertyName("start_latlng")] double[]? StartLatLng = null);

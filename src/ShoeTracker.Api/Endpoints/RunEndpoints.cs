@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using ShoeTracker.Api.Data;
 using ShoeTracker.Api.Dtos;
 using ShoeTracker.Api.Models;
+using ShoeTracker.Api.Services;
+using ShoeTracker.Api.Services.Geocoding;
 
 namespace ShoeTracker.Api.Endpoints;
 
@@ -10,7 +12,7 @@ public static class RunEndpoints
 {
     public static void MapRunEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/shoes/{shoeId:int}/runs", async (int shoeId, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user) =>
+        app.MapPost("/shoes/{shoeId:int}/runs", async (int shoeId, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
             var validation = ValidateRun(request.Date, request.DistanceKm);
             if (validation is not null) return validation;
@@ -34,10 +36,10 @@ public static class RunEndpoints
             db.Runs.Add(run);
             await db.SaveChangesAsync();
 
-            return Results.Created($"/shoes/{shoeId}/runs/{run.Id}", ToResponse(run));
+            return Results.Created($"/shoes/{shoeId}/runs/{run.Id}", await ToResponseAsync(run, places));
         }).RequireAuthorization();
 
-        app.MapGet("/shoes/{shoeId:int}/runs", async (int shoeId, ShoeTrackerContext db, ClaimsPrincipal user) =>
+        app.MapGet("/shoes/{shoeId:int}/runs", async (int shoeId, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
             var userId = user.GetUserId();
             var shoeExists = await db.Shoes.AnyAsync(s => s.Id == shoeId && s.UserId == userId);
@@ -52,11 +54,19 @@ public static class RunEndpoints
                 .ThenByDescending(r => r.Id)
                 .ToListAsync();
 
-            return Results.Ok(runs.Select(ToResponse));
+            return Results.Ok(await ToResponsesAsync(runs, places));
         }).RequireAuthorization();
 
-        app.MapGet("/runs", async (bool? unassigned, ShoeTrackerContext db, ClaimsPrincipal user) =>
+        app.MapGet("/runs", async (bool? unassigned, RunSource? source, int? limit, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
+            if (limit <= 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["limit"] = ["limit must be greater than zero."]
+                });
+            }
+
             var userId = user.GetUserId();
             var query = db.Runs.Where(r => r.UserId == userId);
             if (unassigned == true)
@@ -64,15 +74,20 @@ public static class RunEndpoints
                 query = query.Where(r => r.ShoeId == null);
             }
 
-            var runs = await query
-                .OrderByDescending(r => r.Date)
-                .ThenByDescending(r => r.Id)
-                .ToListAsync();
+            if (source is not null)
+            {
+                query = query.Where(r => r.Source == source);
+            }
 
-            return Results.Ok(runs.Select(ToResponse));
+            var ordered = query
+                .OrderByDescending(r => r.Date)
+                .ThenByDescending(r => r.Id);
+            var runs = await (limit is null ? ordered : ordered.Take(limit.Value)).ToListAsync();
+
+            return Results.Ok(await ToResponsesAsync(runs, places));
         }).RequireAuthorization();
 
-        app.MapPut("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user) =>
+        app.MapPut("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
             var validation = ValidateRun(request.Date, request.DistanceKm);
             if (validation is not null) return validation;
@@ -86,7 +101,7 @@ public static class RunEndpoints
 
             await db.SaveChangesAsync();
 
-            return Results.Ok(ToResponse(run));
+            return Results.Ok(await ToResponseAsync(run, places));
         }).RequireAuthorization();
 
         app.MapDelete("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, ShoeTrackerContext db, ClaimsPrincipal user) =>
@@ -123,5 +138,21 @@ public static class RunEndpoints
         return null;
     }
 
-    private static RunResponse ToResponse(Run run) => new(run.Id, run.Date, run.DistanceKm, run.ShoeId, run.Source);
+    private static async Task<RunResponse> ToResponseAsync(Run run, PlaceNameResolver places) =>
+        (await ToResponsesAsync([run], places))[0];
+
+    private static async Task<List<RunResponse>> ToResponsesAsync(IReadOnlyCollection<Run> runs, PlaceNameResolver places)
+    {
+        var names = await places.NamesForAsync(runs);
+        return runs.Select(run => new RunResponse(
+            run.Id,
+            run.Date,
+            run.DistanceKm,
+            run.ShoeId,
+            run.Source,
+            run.Type,
+            run.IsRace,
+            RunLabels.IsUltra(run.DistanceKm),
+            names.GetValueOrDefault(run.Id))).ToList();
+    }
 }

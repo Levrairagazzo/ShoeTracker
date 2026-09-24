@@ -1,4 +1,4 @@
-import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, StravaStatus, ValidationProblem } from './types'
+import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, StravaImportResult, StravaStatus, ValidationProblem } from './types'
 
 const BASE_URL = '/api'
 
@@ -63,6 +63,11 @@ export const shoeTrackerClient = {
   me: () => request<CurrentUser>('/auth/me'),
 
   stravaStatus: () => request<StravaStatus>('/strava/status'),
+
+  /** The user's most recent runs imported from Strava, newest first. */
+  latestStravaRuns: (limit: number) => request<Run[]>(`/runs?source=Strava&limit=${limit}`),
+
+  importStrava: () => request<StravaImportResult>('/strava/import', { method: 'POST' }),
 
   disconnectStrava: () => request<void>('/strava/connection', { method: 'DELETE' }),
 
