@@ -53,4 +53,23 @@ public class UserScopingTests : ApiTestBase
         var runs = await owner.GetFromJsonAsync<List<RunResponse>>($"/shoes/{shoe.Id}/runs");
         Assert.Equal(10, Assert.Single(runs!).DistanceKm);
     }
+
+    [Fact]
+    public async Task ListAllRuns_OnlyReturnsCurrentUsersRuns_IncludingUnassigned()
+    {
+        var owner = await LoginAsync(OwnerEmail);
+        var other = await LoginAsync(OtherEmail);
+        var shoe = await CreateShoeAsync(owner);
+        var assigned = await LogRunAsync(owner, shoe.Id, 10);
+        var unassignedId = AddUnassignedRun(OwnerEmail, 20, new DateOnly(2026, 1, 1));
+        var otherUnassignedId = AddUnassignedRun(OtherEmail, 30, new DateOnly(2026, 1, 1));
+
+        var ownerRuns = await owner.GetFromJsonAsync<List<RunResponse>>("/runs");
+        var otherRuns = await other.GetFromJsonAsync<List<RunResponse>>("/runs");
+        var otherUnassigned = await other.GetFromJsonAsync<List<RunResponse>>("/runs?unassigned=true");
+
+        Assert.Equal([assigned.Id, unassignedId], ownerRuns!.Select(r => r.Id));
+        Assert.Equal([otherUnassignedId], otherRuns!.Select(r => r.Id));
+        Assert.Equal([otherUnassignedId], otherUnassigned!.Select(r => r.Id));
+    }
 }

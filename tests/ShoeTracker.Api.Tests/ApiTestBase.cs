@@ -77,6 +77,29 @@ public abstract class ApiTestBase : IDisposable
         return (await response.Content.ReadFromJsonAsync<RunResponse>())!;
     }
 
+    /// <summary>
+    /// Inserts a run with no shoe directly into the DB, standing in for an imported Strava run
+    /// until the import exists.
+    /// </summary>
+    protected int AddUnassignedRun(string email, double distanceKm, DateOnly date)
+    {
+        var id = 0;
+        WithDb(db =>
+        {
+            var run = new Run
+            {
+                UserId = db.Users.Single(u => u.Email == email).Id,
+                Date = date,
+                DistanceKm = distanceKm,
+                Source = RunSource.Strava
+            };
+            db.Runs.Add(run);
+            db.SaveChanges();
+            id = run.Id;
+        });
+        return id;
+    }
+
     /// <summary>Returns the field names in a ValidationProblem response's <c>errors</c> object.</summary>
     protected static async Task<IReadOnlyList<string>> ValidationErrorFieldsAsync(HttpResponseMessage response)
     {

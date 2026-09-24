@@ -28,5 +28,19 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
             .WithOne(s => s.User)
             .HasForeignKey(s => s.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasMany<Run>()
+            .WithOne(r => r.User)
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Run>()
+            .Property(r => r.Source)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<Run>()
+            .HasIndex(r => new { r.UserId, r.StravaActivityId })
+            .IsUnique();
     }
 }

@@ -41,7 +41,8 @@ These apply across the epics:
 
 **Data model changes** (made in E1a, used by everything after):
 - `Run` gains `UserId`, a nullable `ShoeId`, `Source` and a unique, nullable `StravaActivityId`. The migration backfills `UserId` from each existing run's shoe, and existing runs become `Manual`.
-- The run endpoints are currently nested under `/shoes/{shoeId}/runs`. Unassigned runs have no shoe, so they need a user-level route (e.g. `/runs`). *Route shape decided at implementation.*
+- The run endpoints are nested under `/shoes/{shoeId}/runs`. Unassigned runs have no shoe, so `GET /runs` lists all of my runs (`?unassigned=true` for only unassigned ones). Reassigning is added in E1b.
+- **Deleting a shoe** still deletes its runs, as today. Once Strava runs exist, deleting a shoe should unassign its Strava runs instead of deleting them, since they're Strava's. *Handled in E1b.*
 - `UserScopingTests` is extended to cover unassigned runs and the new routes. CLAUDE.md's "ownership through `Run.Shoe`" note is updated.
 
 **E1a — Connect and import history**
