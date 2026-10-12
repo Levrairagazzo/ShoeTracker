@@ -1,4 +1,4 @@
-import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, ValidationProblem } from './types'
+import type { CreateRunRequest, CreateShoeRequest, CurrentUser, LoginRequest, Run, Shoe, StravaImportResult, StravaStatus, ValidationProblem } from './types'
 
 const BASE_URL = '/api'
 
@@ -61,6 +61,29 @@ export const shoeTrackerClient = {
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
 
   me: () => request<CurrentUser>('/auth/me'),
+
+  stravaStatus: () => request<StravaStatus>('/strava/status'),
+
+  /** Pass null to have no default shoe. */
+  setDefaultShoe: (shoeId: number | null) =>
+    request<void>('/shoes/default', { method: 'PUT', body: JSON.stringify({ shoeId }) }),
+
+  /** Moves a run to another shoe, or unassigns it with null. */
+  moveRun: (runId: number, shoeId: number | null) =>
+    request<Run>(`/runs/${runId}/shoe`, { method: 'PUT', body: JSON.stringify({ shoeId }) }),
+
+  /** The user's most recent runs that aren't assigned to a shoe, newest first. */
+  unassignedRuns: (limit: number) => request<Run[]>(`/runs?unassigned=true&limit=${limit}`),
+
+  /** The user's most recent runs imported from Strava, newest first. */
+  latestStravaRuns: (limit: number) => request<Run[]>(`/runs?source=Strava&limit=${limit}`),
+
+  importStrava: () => request<StravaImportResult>('/strava/import', { method: 'POST' }),
+
+  disconnectStrava: () => request<void>('/strava/connection', { method: 'DELETE' }),
+
+  /** Navigate the whole page here (not fetch): the API redirects on to Strava's consent screen. */
+  stravaConnectUrl: `${BASE_URL}/strava/connect`,
 }
 
 export { ApiError }

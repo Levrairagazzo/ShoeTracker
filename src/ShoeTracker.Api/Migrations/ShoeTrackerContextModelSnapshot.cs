@@ -17,6 +17,28 @@ namespace ShoeTracker.Api.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
 
+            modelBuilder.Entity("ShoeTracker.Api.Models.PlaceName", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AreaKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaKey")
+                        .IsUnique();
+
+                    b.ToTable("PlaceNames");
+                });
+
             modelBuilder.Entity("ShoeTracker.Api.Models.Run", b =>
                 {
                     b.Property<int>("Id")
@@ -29,12 +51,37 @@ namespace ShoeTracker.Api.Migrations
                     b.Property<double>("DistanceKm")
                         .HasColumnType("REAL");
 
-                    b.Property<int>("ShoeId")
+                    b.Property<bool>("IsRace")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ShoeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("StartLatitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("StartLongitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<long?>("StravaActivityId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Type")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ShoeId");
+
+                    b.HasIndex("UserId", "StravaActivityId")
+                        .IsUnique();
 
                     b.ToTable("Runs");
                 });
@@ -72,10 +119,55 @@ namespace ShoeTracker.Api.Migrations
                     b.ToTable("Shoes");
                 });
 
+            modelBuilder.Entity("ShoeTracker.Api.Models.StravaConnection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("AthleteId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AthleteName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("ConnectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EncryptedAccessToken")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EncryptedRefreshToken")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("StravaConnections");
+                });
+
             modelBuilder.Entity("ShoeTracker.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DefaultShoeId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Email")
@@ -88,6 +180,8 @@ namespace ShoeTracker.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DefaultShoeId");
+
                     b.HasIndex("Email")
                         .IsUnique();
 
@@ -99,10 +193,17 @@ namespace ShoeTracker.Api.Migrations
                     b.HasOne("ShoeTracker.Api.Models.Shoe", "Shoe")
                         .WithMany("Runs")
                         .HasForeignKey("ShoeId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("ShoeTracker.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Shoe");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ShoeTracker.Api.Models.Shoe", b =>
@@ -114,6 +215,27 @@ namespace ShoeTracker.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ShoeTracker.Api.Models.StravaConnection", b =>
+                {
+                    b.HasOne("ShoeTracker.Api.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("ShoeTracker.Api.Models.StravaConnection", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ShoeTracker.Api.Models.User", b =>
+                {
+                    b.HasOne("ShoeTracker.Api.Models.Shoe", "DefaultShoe")
+                        .WithMany()
+                        .HasForeignKey("DefaultShoeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("DefaultShoe");
                 });
 
             modelBuilder.Entity("ShoeTracker.Api.Models.Shoe", b =>

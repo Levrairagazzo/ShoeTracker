@@ -7,12 +7,18 @@
 #   backup.sh        loop forever: snapshot every $BACKUP_INTERVAL_HOURS as
 #                    shoetracker-auto-<timestamp>.db, keeping the newest $BACKUP_KEEP
 #   backup.sh once   take one manual snapshot, shoetracker-<timestamp>.db, never pruned
+#
+# Each run also copies the API's Data Protection key ring into $BACKUP_DIR/keys.
+# The database's Strava tokens are encrypted with those keys, so a restored
+# database is only fully usable with them. The key ring only ever gains files,
+# so one cumulative copy (never pruned) covers every snapshot.
 set -eu
 
 DB_PATH="${DB_PATH:-/data/shoetracker.db}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 BACKUP_INTERVAL_HOURS="${BACKUP_INTERVAL_HOURS:-24}"
 BACKUP_KEEP="${BACKUP_KEEP:-14}"
+KEYS_DIR="${KEYS_DIR:-/data/keys}"
 
 log() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"
@@ -47,6 +53,15 @@ take_backup() {
   mv "$final.partial" "$final"
   rm -rf "$work"
   log "Backup written to $final ($(wc -c < "$final") bytes)."
+  backup_keys
+}
+
+backup_keys() {
+  if ls "$KEYS_DIR"/*.xml >/dev/null 2>&1; then
+    mkdir -p "$BACKUP_DIR/keys"
+    cp -p "$KEYS_DIR"/*.xml "$BACKUP_DIR/keys/"
+    log "Key ring copied to $BACKUP_DIR/keys."
+  fi
 }
 
 prune_automated() {

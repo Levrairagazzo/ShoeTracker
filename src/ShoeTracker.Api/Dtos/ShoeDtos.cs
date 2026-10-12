@@ -10,4 +10,8 @@ public record ShoeResponse(
     double ThresholdKm,
     bool IsRetired,
     double TotalDistanceKm,
-    bool IsOverThreshold);
+    bool IsOverThreshold,
+    bool IsDefault);
+
+/// <param name="ShoeId">The new default shoe, or null to have no default.</param>
+public record SetDefaultShoeRequest(int? ShoeId);

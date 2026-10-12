@@ -31,7 +31,7 @@ export function ShoeGrid({ shoes, onAddShoe, onChanged }: ShoeGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
       {shoes.map((shoe) => (
-        <ShoeCard key={shoe.id} shoe={shoe} onChanged={onChanged} />
+        <ShoeCard key={shoe.id} shoe={shoe} shoes={shoes} onChanged={onChanged} />
       ))}
     </div>
   )

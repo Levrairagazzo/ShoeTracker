@@ -6,8 +6,10 @@
 # Steps: integrity-check the backup, take a manual safety snapshot of the
 # current database (so the restore itself can be undone), stop the API and
 # backup services, swap the file into the shoe-data volume (dropping the old
-# -wal/-shm files, which belong to the replaced database), then start them
-# again. Pass --yes to skip the confirmation prompt.
+# -wal/-shm files, which belong to the replaced database), merge the backed-up
+# Data Protection key ring (backups/keys) into the volume so the restored
+# database's encrypted Strava tokens can still be read, then start them again.
+# Pass --yes to skip the confirmation prompt.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -71,6 +73,12 @@ in_backup_container '
   chown "$owner" /data/shoetracker.db.restoring
   rm -f /data/shoetracker.db-wal /data/shoetracker.db-shm
   mv /data/shoetracker.db.restoring /data/shoetracker.db
+  # Merge only (-n): the key ring is additive, and existing keys are still needed.
+  if ls /backups/keys/*.xml >/dev/null 2>&1; then
+    mkdir -p /data/keys
+    cp -n /backups/keys/*.xml /data/keys/
+    chown -R "$owner" /data/keys
+  fi
 '
 
 echo "Starting api and backup services..."
