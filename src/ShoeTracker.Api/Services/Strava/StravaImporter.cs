@@ -21,8 +21,9 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
     /// <returns>The number of newly imported runs, or null if the user hasn't connected Strava.</returns>
     public async Task<int?> ImportAsync(int userId, CancellationToken ct = default)
     {
+        var connection = await tokens.GetConnectionAsync(userId, ct);
         var accessToken = await tokens.GetValidAccessTokenAsync(userId, ct);
-        if (accessToken is null) return null;
+        if (connection is null || accessToken is null) return null;
 
         var existing = await db.Runs
             .Where(r => r.UserId == userId && r.StravaActivityId != null)
@@ -30,12 +31,10 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
 
         var after = IncrementalStart(existing.Values);
 
-        // The first import is the user's history, which stays unassigned (E2 estimates it);
-        // runs arriving after that are new and go to the default shoe, if one is set.
-        var isFirstImport = existing.Count == 0;
-        var shoeForNewRuns = isFirstImport
-            ? null
-            : await db.Users.Where(u => u.Id == userId).Select(u => u.DefaultShoeId).SingleAsync(ct);
+        // The first import after connecting is the user's history, which stays unassigned (E2
+        // estimates it); runs arriving after that are new and go to the default shoe, if one is set.
+        var isFirstImport = connection.HistoryImportedAt is null;
+        var shoeForNewRuns = isFirstImport ? null : await DefaultShoeAsync(userId, ct);
 
         var imported = 0;
         for (var page = 1; ; page++)
@@ -61,9 +60,54 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
             if (activities.Count < PageSize) break;
         }
 
+        connection.HistoryImportedAt ??= DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return imported;
     }
+
+    /// <summary>
+    /// Brings one activity's run in line with Strava (used for webhook events, which only say
+    /// that something changed): adds it if it's a new run, updates it, or removes it if it's been
+    /// deleted or is no longer a run. Ignored until the user's history has been imported.
+    /// </summary>
+    public async Task<ActivitySyncResult> SyncActivityAsync(int userId, long activityId, CancellationToken ct = default)
+    {
+        var connection = await tokens.GetConnectionAsync(userId, ct);
+        if (connection?.HistoryImportedAt is null) return ActivitySyncResult.Ignored;
+
+        var accessToken = await tokens.GetValidAccessTokenAsync(userId, ct);
+        if (accessToken is null) return ActivitySyncResult.Ignored;
+
+        var activity = await strava.GetActivityAsync(accessToken, activityId, ct);
+        // Strava shows other athletes' public activities too; only the user's own count.
+        if (activity is not null && activity.Athlete?.Id != connection.AthleteId) return ActivitySyncResult.Ignored;
+
+        var run = await db.Runs.SingleOrDefaultAsync(r => r.UserId == userId && r.StravaActivityId == activityId, ct);
+        ActivitySyncResult result;
+        if (activity is null || !IsRun(activity) || activity.Distance <= 0)
+        {
+            if (run is null) return ActivitySyncResult.Ignored;
+            db.Runs.Remove(run);
+            result = ActivitySyncResult.Removed;
+        }
+        else
+        {
+            result = ActivitySyncResult.Updated;
+            if (run is null)
+            {
+                run = new Run { UserId = userId, ShoeId = await DefaultShoeAsync(userId, ct), Source = RunSource.Strava, StravaActivityId = activityId };
+                db.Runs.Add(run);
+                result = ActivitySyncResult.Added;
+            }
+            Apply(activity, run);
+        }
+
+        await db.SaveChangesAsync(ct);
+        return result;
+    }
+
+    private Task<int?> DefaultShoeAsync(int userId, CancellationToken ct) =>
+        db.Users.Where(u => u.Id == userId).Select(u => u.DefaultShoeId).SingleAsync(ct);
 
     /// <summary>
     /// Only ask for activities from the day before the latest imported run. Dates are local to
@@ -99,4 +143,12 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
         "TrailRun" => RunType.Trail,
         _ => RunType.Run
     };
+}
+
+public enum ActivitySyncResult
+{
+    Ignored,
+    Added,
+    Updated,
+    Removed
 }

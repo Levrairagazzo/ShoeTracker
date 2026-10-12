@@ -9,6 +9,9 @@ services:
       - Strava__ClientId=${STRAVA_CLIENT_ID:-}
       - Strava__ClientSecret=${STRAVA_CLIENT_SECRET:-}
       - Strava__RedirectUri=${STRAVA_REDIRECT_URI:-https://milesleft.run/api/strava/callback}
+      # Where Strava posts new/changed runs; the API subscribes on startup. Set it to an
+      # empty value where Strava can't reach the app (e.g. local Docker).
+      - Strava__WebhookCallbackUrl=${STRAVA_WEBHOOK_CALLBACK_URL-https://milesleft.run/api/strava/webhook}
       # Key ring for the auth cookie and the encrypted Strava tokens; on the data
       # volume so it survives rebuilds (and is picked up by the backup service).
       - DataProtection__KeysPath=/data/keys

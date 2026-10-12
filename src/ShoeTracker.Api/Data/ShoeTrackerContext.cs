@@ -66,5 +66,9 @@ public class ShoeTrackerContext(DbContextOptions<ShoeTrackerContext> options) : 
             .WithOne(c => c.User)
             .HasForeignKey<StravaConnection>(c => c.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Webhook events identify the user only by their Strava athlete id.
+        modelBuilder.Entity<StravaConnection>()
+            .HasIndex(c => c.AthleteId);
     }
 }

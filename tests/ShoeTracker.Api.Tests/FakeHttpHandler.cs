@@ -31,10 +31,13 @@ public class FakeHttpHandler : HttpMessageHandler
         access_token = accessToken,
         refresh_token = refreshToken,
         expires_at = expiresAt.ToUnixTimeSeconds(),
-        athlete = withAthlete ? new { id = 12345L, firstname = "Test", lastname = "Runner" } : null
+        athlete = withAthlete ? new { id = ApiTestBase.StravaAthleteId, firstname = "Test", lastname = "Runner" } : null
     };
 
-    /// <summary>A Strava activity as <c>/athlete/activities</c> returns it (only the fields the app reads).</summary>
+    /// <summary>
+    /// A Strava activity as <c>/athlete/activities</c> and <c>/activities/{id}</c> return it (only the
+    /// fields the app reads), owned by <see cref="ApiTestBase.StravaAthleteId"/> unless stated otherwise.
+    /// </summary>
     public static object Activity(
         long id,
         double distanceMetres,
@@ -42,9 +45,11 @@ public class FakeHttpHandler : HttpMessageHandler
         string sportType = "Run",
         bool trainer = false,
         int? workoutType = null,
-        double[]? startLatLng = null) => new
+        double[]? startLatLng = null,
+        long athleteId = ApiTestBase.StravaAthleteId) => new
     {
         id,
+        athlete = new { id = athleteId },
         type = sportType,
         sport_type = sportType,
         distance = distanceMetres,

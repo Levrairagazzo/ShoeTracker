@@ -146,6 +146,9 @@ namespace ShoeTracker.Api.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("HistoryImportedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Scope")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -154,6 +157,8 @@ namespace ShoeTracker.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AthleteId");
 
                     b.HasIndex("UserId")
                         .IsUnique();

@@ -55,7 +55,7 @@ These apply across the epics:
 
 **E1b — New runs flow in automatically**
 
-*Status:* default shoe, reassigning, the unassigned list and read-only Strava runs are built (PR A). The webhook is next (PR B). Rule decided: newly imported runs go to the default shoe on every import except the very first one, which is the history and stays unassigned.
+*Status:* default shoe, reassigning, the unassigned list and read-only Strava runs are built (PR A). The webhook is built (PR B); "Import new runs" is the Sync now fallback. Decided in PR B: webhook events are hints, and each change is confirmed by fetching the activity from Strava; runs from while Strava was disconnected arrive unassigned, like the history. Rule decided: newly imported runs go to the default shoe on every import except the very first one, which is the history and stays unassigned.
 
 - **Default shoe:** I mark one shoe as my current default, and each new Strava run is assigned to it automatically. With no default set, new runs arrive unassigned.
 - **Reassign:** one click moves any run to another shoe or back to unassigned. An "Unassigned runs" list lets me sort out the leftovers, including old history runs I want to attribute to a shoe.
