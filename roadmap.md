@@ -54,6 +54,9 @@ These apply across the epics:
 - Rate limits (100 requests per 15 min, 1,000 per day) aren't a concern: 200 activities per page, so years of history is a handful of calls.
 
 **E1b — New runs flow in automatically**
+
+*Status:* default shoe, reassigning, the unassigned list and read-only Strava runs are built (PR A). The webhook is next (PR B). Rule decided: newly imported runs go to the default shoe on every import except the very first one, which is the history and stays unassigned.
+
 - **Default shoe:** I mark one shoe as my current default, and each new Strava run is assigned to it automatically. With no default set, new runs arrive unassigned.
 - **Reassign:** one click moves any run to another shoe or back to unassigned. An "Unassigned runs" list lets me sort out the leftovers, including old history runs I want to attribute to a shoe.
 - **Getting new runs:** a Strava webhook (create/update/delete events) in prod, since `milesleft.run` is public. There's also a "Sync now" button, doing an incremental pull, for local dev and as a fallback if a webhook is missed.

@@ -8,6 +8,8 @@ import { ShoeForm } from './ShoeForm'
 
 interface ShoeCardProps {
   shoe: Shoe
+  /** all the user's shoes, for moving runs between them */
+  shoes: Shoe[]
   onChanged: () => void
 }
 
@@ -29,7 +31,7 @@ function statusPill(shoe: Shoe) {
   return { label: 'On track', className: 'bg-emerald-500/10 text-emerald-600' }
 }
 
-export function ShoeCard({ shoe, onChanged }: ShoeCardProps) {
+export function ShoeCard({ shoe, shoes, onChanged }: ShoeCardProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
@@ -64,11 +66,21 @@ export function ShoeCard({ shoe, onChanged }: ShoeCardProps) {
             <span className="ml-1 text-sm font-normal text-text">km</span>
           </p>
 
-          <span
-            className={`mt-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.className}`}
-          >
-            {pill.label}
-          </span>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.className}`}
+            >
+              {pill.label}
+            </span>
+            {shoe.isDefault && (
+              <span
+                title="New Strava runs are assigned to this shoe"
+                className="inline-flex items-center rounded-full border border-accent-border px-2.5 py-0.5 text-xs font-medium text-accent"
+              >
+                Default
+              </span>
+            )}
+          </div>
 
           <div className="mt-3 h-1.5 w-full max-w-40 overflow-hidden rounded-full bg-border">
             <div
@@ -136,7 +148,14 @@ export function ShoeCard({ shoe, onChanged }: ShoeCardProps) {
 
         <div className="mt-4 border-t border-border pt-3">
           <p className="mb-2 text-xs font-medium text-text">Run history</p>
-          {isOpen && <RunHistoryList shoeId={shoe.id} onChanged={onChanged} />}
+          {isOpen && (
+            <RunHistoryList
+              shoeId={shoe.id}
+              shoes={shoes}
+              reloadKey={shoe.totalDistanceKm}
+              onChanged={onChanged}
+            />
+          )}
         </div>
       </div>
 

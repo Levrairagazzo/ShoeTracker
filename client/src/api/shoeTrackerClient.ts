@@ -64,6 +64,17 @@ export const shoeTrackerClient = {
 
   stravaStatus: () => request<StravaStatus>('/strava/status'),
 
+  /** Pass null to have no default shoe. */
+  setDefaultShoe: (shoeId: number | null) =>
+    request<void>('/shoes/default', { method: 'PUT', body: JSON.stringify({ shoeId }) }),
+
+  /** Moves a run to another shoe, or unassigns it with null. */
+  moveRun: (runId: number, shoeId: number | null) =>
+    request<Run>(`/runs/${runId}/shoe`, { method: 'PUT', body: JSON.stringify({ shoeId }) }),
+
+  /** The user's most recent runs that aren't assigned to a shoe, newest first. */
+  unassignedRuns: (limit: number) => request<Run[]>(`/runs?unassigned=true&limit=${limit}`),
+
   /** The user's most recent runs imported from Strava, newest first. */
   latestStravaRuns: (limit: number) => request<Run[]>(`/runs?source=Strava&limit=${limit}`),
 

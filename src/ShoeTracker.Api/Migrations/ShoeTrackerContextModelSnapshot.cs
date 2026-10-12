@@ -167,6 +167,9 @@ namespace ShoeTracker.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("DefaultShoeId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -176,6 +179,8 @@ namespace ShoeTracker.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DefaultShoeId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -221,6 +226,16 @@ namespace ShoeTracker.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ShoeTracker.Api.Models.User", b =>
+                {
+                    b.HasOne("ShoeTracker.Api.Models.Shoe", "DefaultShoe")
+                        .WithMany()
+                        .HasForeignKey("DefaultShoeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("DefaultShoe");
                 });
 
             modelBuilder.Entity("ShoeTracker.Api.Models.Shoe", b =>

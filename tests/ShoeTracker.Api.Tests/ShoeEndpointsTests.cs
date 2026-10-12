@@ -16,7 +16,7 @@ public class ShoeEndpointsTests : ApiTestBase
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var shoe = await response.Content.ReadFromJsonAsync<ShoeResponse>();
         Assert.Equal($"/shoes/{shoe!.Id}", response.Headers.Location?.OriginalString);
-        Assert.Equal(new ShoeResponse(shoe.Id, "Pegasus", "Nike", new DateOnly(2026, 1, 1), 700, false, 0, false), shoe);
+        Assert.Equal(new ShoeResponse(shoe.Id, "Pegasus", "Nike", new DateOnly(2026, 1, 1), 700, false, 0, false, false), shoe);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class ShoeEndpointsTests : ApiTestBase
         var response = await client.PutAsJsonAsync($"/shoes/{shoe.Id}", new CreateShoeRequest("Vaporfly", "Nike", new DateOnly(2026, 2, 1), 40));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var expected = new ShoeResponse(shoe.Id, "Vaporfly", "Nike", new DateOnly(2026, 2, 1), 40, false, 50, true);
+        var expected = new ShoeResponse(shoe.Id, "Vaporfly", "Nike", new DateOnly(2026, 2, 1), 40, false, 50, true, false);
         Assert.Equal(expected, await response.Content.ReadFromJsonAsync<ShoeResponse>());
         Assert.Equal(expected, await client.GetFromJsonAsync<ShoeResponse>($"/shoes/{shoe.Id}"));
     }

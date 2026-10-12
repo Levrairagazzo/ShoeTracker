@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, shoeTrackerClient } from '../api/shoeTrackerClient'
-import type { Run, RunType, StravaStatus } from '../api/types'
+import type { Run, Shoe, StravaStatus } from '../api/types'
+import { StravaRunTable } from './StravaRunTable'
 
 const LATEST_RUNS_SHOWN = 10
+const UNASSIGNED_PAGE = 20
+
+interface StravaConnectionProps {
+  shoes: Shoe[]
+  /** Called after runs move between shoes or the default shoe changes, so shoe totals reload. */
+  onRunsChanged: () => void
+}
 
 interface Notice {
   text: string
@@ -29,27 +37,15 @@ function takeResultFromUrl(): string | null {
   return result
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-const TYPE_LABELS: Record<RunType, string> = { Run: 'Run', Trail: 'Trail', Treadmill: 'Treadmill' }
-
-function Badge({ children }: { children: string }) {
-  return <span className="rounded-full bg-accent-bg px-2 py-0.5 text-xs font-medium text-accent">{children}</span>
-}
-
 function pluralRuns(count: number) {
   return `${count} run${count === 1 ? '' : 's'}`
 }
 
-export function StravaConnection() {
+export function StravaConnection({ shoes, onRunsChanged }: StravaConnectionProps) {
   const [status, setStatus] = useState<StravaStatus | null>(null)
   const [latestRuns, setLatestRuns] = useState<Run[]>([])
+  const [unassignedRuns, setUnassignedRuns] = useState<Run[]>([])
+  const [unassignedShown, setUnassignedShown] = useState(UNASSIGNED_PAGE)
   const [result] = useState(takeResultFromUrl)
   const [notice, setNotice] = useState<Notice | null>(result ? (RESULT_NOTICES[result] ?? RESULT_NOTICES.error) : null)
   const [busy, setBusy] = useState(false)
@@ -59,7 +55,8 @@ export function StravaConnection() {
     const next = await shoeTrackerClient.stravaStatus()
     setStatus(next)
     setLatestRuns(next.importedRuns > 0 ? await shoeTrackerClient.latestStravaRuns(LATEST_RUNS_SHOWN) : [])
-  }, [])
+    setUnassignedRuns(next.unassignedRuns > 0 ? await shoeTrackerClient.unassignedRuns(unassignedShown) : [])
+  }, [unassignedShown])
 
   const runImport = useCallback(
     async (prefix: string) => {
@@ -71,6 +68,7 @@ export function StravaConnection() {
           text: `${prefix}${imported === 0 ? 'No new runs to import.' : `Imported ${pluralRuns(imported)}.`}`,
           isError: false,
         })
+        onRunsChanged()
       } catch (error) {
         const detail = error instanceof ApiError ? error.problem?.detail : undefined
         setNotice({ text: detail ?? 'Importing from Strava failed. Please try again.', isError: true })
@@ -79,18 +77,23 @@ export function StravaConnection() {
         await refreshStatus().catch(() => {})
       }
     },
-    [refreshStatus],
+    [refreshStatus, onRunsChanged],
   )
 
+  // Re-reads the lists whenever the shoes reload too, since that's how moves made from a
+  // shoe card show up here.
   useEffect(() => {
     refreshStatus().catch(() => setStatus(null))
+  }, [refreshStatus, shoes])
+
+  useEffect(() => {
     // Import the history straight away after connecting. The ref stops StrictMode's
     // double-run of effects in dev from starting two imports at once.
     if (result === 'connected' && !autoImportStarted.current) {
       autoImportStarted.current = true
       runImport('Strava connected. ')
     }
-  }, [result, refreshStatus, runImport])
+  }, [result, runImport])
 
   async function handleDisconnect() {
     setBusy(true)
@@ -103,7 +106,19 @@ export function StravaConnection() {
     }
   }
 
+  async function handleDefaultShoeChange(value: string) {
+    try {
+      await shoeTrackerClient.setDefaultShoe(value === '' ? null : Number(value))
+      onRunsChanged()
+    } catch {
+      setNotice({ text: 'Could not change the default shoe. Please try again.', isError: true })
+    }
+  }
+
   if (!status?.available && !notice) return null
+
+  const defaultShoe = shoes.find((s) => s.isDefault)
+  const activeShoes = shoes.filter((s) => !s.isRetired)
 
   return (
     <section className="mb-6 flex flex-col gap-3">
@@ -159,37 +174,60 @@ export function StravaConnection() {
         </div>
       )}
 
+      {status?.connected && (
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          New Strava runs go to
+          <select
+            value={defaultShoe?.id.toString() ?? ''}
+            onChange={(e) => handleDefaultShoeChange(e.target.value)}
+            className="rounded-md border border-border bg-bg px-2 py-1 text-sm text-text-h"
+          >
+            <option value="">No shoe (leave unassigned)</option>
+            {activeShoes.map((shoe) => (
+              <option key={shoe.id} value={shoe.id}>
+                {shoe.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {status && status.unassignedRuns > 0 && (
+        <details className="max-w-3xl text-sm">
+          <summary className="cursor-pointer font-medium text-text-h">
+            Unassigned runs ({status.unassignedRuns})
+          </summary>
+          <StravaRunTable
+            runs={unassignedRuns}
+            shoes={shoes}
+            onMoved={() => {
+              refreshStatus().catch(() => {})
+              onRunsChanged()
+            }}
+          />
+          {unassignedRuns.length < status.unassignedRuns && (
+            <button
+              type="button"
+              onClick={() => setUnassignedShown((n) => n + UNASSIGNED_PAGE)}
+              className="mt-2 rounded-full px-3 py-1 font-medium text-accent hover:bg-accent-bg"
+            >
+              Show more
+            </button>
+          )}
+        </details>
+      )}
+
       {latestRuns.length > 0 && (
-        <details className="max-w-2xl text-sm">
+        <details className="max-w-3xl text-sm">
           <summary className="cursor-pointer font-medium text-text-h">Latest imported runs</summary>
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="text-xs text-text">
-                <tr className="border-b border-border">
-                  <th className="py-1.5 pr-4 font-medium">Date</th>
-                  <th className="py-1.5 pr-4 text-right font-medium">Distance</th>
-                  <th className="py-1.5 pr-4 font-medium">Type</th>
-                  <th className="py-1.5 font-medium">Location</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border text-text-h">
-                {latestRuns.map((run) => (
-                  <tr key={run.id}>
-                    <td className="py-1.5 pr-4 whitespace-nowrap">{formatDate(run.date)}</td>
-                    <td className="py-1.5 pr-4 text-right whitespace-nowrap">{run.distanceKm.toFixed(1)} km</td>
-                    <td className="py-1.5 pr-4">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        {run.type ? TYPE_LABELS[run.type] : '—'}
-                        {run.isUltra && <Badge>Ultra</Badge>}
-                        {run.isRace && <Badge>Race</Badge>}
-                      </span>
-                    </td>
-                    <td className="py-1.5">{run.location ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <StravaRunTable
+            runs={latestRuns}
+            shoes={shoes}
+            onMoved={() => {
+              refreshStatus().catch(() => {})
+              onRunsChanged()
+            }}
+          />
         </details>
       )}
     </section>

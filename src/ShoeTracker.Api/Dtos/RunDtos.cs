@@ -4,6 +4,9 @@ namespace ShoeTracker.Api.Dtos;
 
 public record CreateRunRequest(DateOnly Date, double DistanceKm);
 
+/// <param name="ShoeId">The shoe to move the run to, or null to unassign it.</param>
+public record AssignRunRequest(int? ShoeId);
+
 /// <param name="Type">Null for manual runs.</param>
 /// <param name="IsUltra">Longer than a marathon.</param>
 /// <param name="Location">Where the run started, e.g. "Oakland, California"; null if unknown or not looked up yet.</param>
