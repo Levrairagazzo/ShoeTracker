@@ -15,6 +15,12 @@ public class StravaOptions
     /// </summary>
     public string? RedirectUri { get; set; }
 
+    /// <summary>
+    /// Public URL of <c>/strava/webhook</c> (again including <c>/api</c>). When set, the app
+    /// subscribes to Strava's webhook events on startup. Leave unset where Strava can't reach the app.
+    /// </summary>
+    public string? WebhookCallbackUrl { get; set; }
+
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ClientId)
         && !string.IsNullOrWhiteSpace(ClientSecret)

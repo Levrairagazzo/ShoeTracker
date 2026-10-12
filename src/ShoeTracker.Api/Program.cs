@@ -52,6 +52,12 @@ builder.Services.Configure<StravaOptions>(builder.Configuration.GetSection(Strav
 builder.Services.AddHttpClient<StravaClient>(client => client.BaseAddress = StravaClient.BaseAddress);
 builder.Services.AddScoped<StravaTokenStore>();
 builder.Services.AddScoped<StravaImporter>();
+builder.Services.AddScoped<StravaWebhookHandler>();
+builder.Services.AddSingleton<StravaWebhookQueue>();
+builder.Services.AddHostedService<StravaWebhookBackgroundService>();
+// A singleton as well as a hosted service: the webhook endpoint reads its verify token.
+builder.Services.AddSingleton<StravaWebhookSubscriber>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StravaWebhookSubscriber>());
 
 builder.Services.Configure<GeocodingOptions>(builder.Configuration.GetSection(GeocodingOptions.SectionName));
 builder.Services.AddHttpClient<NominatimClient>(client =>

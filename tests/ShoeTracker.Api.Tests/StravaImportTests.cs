@@ -204,6 +204,44 @@ public class StravaImportTests : ApiTestBase
     }
 
     [Fact]
+    public async Task FirstImport_WithAnEmptyHistory_StillCountsAsTheHistory()
+    {
+        var client = await LoginAsync();
+        var shoe = await CreateShoeAsync(client);
+        await SetDefaultShoeAsync(client, shoe.Id);
+        await ConnectStravaAsync(OwnerEmail);
+        ServeActivities([]);
+        await ImportAsync(client);
+        ServeActivities([FakeHttpHandler.Activity(1, 5_000, "2026-03-01T07:00:00Z")]);
+
+        await ImportAsync(client);
+
+        Assert.Equal(shoe.Id, Assert.Single(StravaRuns()).ShoeId);
+    }
+
+    [Fact]
+    public async Task Reconnecting_TreatsTheNextImportAsTheHistoryAgain()
+    {
+        var client = await LoginAsync();
+        var shoe = await CreateShoeAsync(client);
+        await SetDefaultShoeAsync(client, shoe.Id);
+        await ConnectStravaAsync(OwnerEmail);
+        ServeActivities([FakeHttpHandler.Activity(1, 5_000, "2026-03-01T07:00:00Z")]);
+        await ImportAsync(client);
+        (await client.DeleteAsync("/strava/connection")).EnsureSuccessStatusCode();
+        await ConnectStravaAsync(OwnerEmail);
+        // Runs from while Strava was disconnected can't be assumed to be in the default shoe.
+        ServeActivities([
+            FakeHttpHandler.Activity(1, 5_000, "2026-03-01T07:00:00Z"),
+            FakeHttpHandler.Activity(2, 6_000, "2026-03-02T07:00:00Z"),
+        ]);
+
+        await ImportAsync(client);
+
+        Assert.All(StravaRuns(), r => Assert.Null(r.ShoeId));
+    }
+
+    [Fact]
     public async Task Import_PagesThroughTheWholeHistory()
     {
         var client = await LoginAsync();

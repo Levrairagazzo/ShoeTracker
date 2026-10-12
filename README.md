@@ -8,7 +8,7 @@ ShoeTracker is a small web app for runners to track mileage on their running sho
 
 - **Add, edit, and delete shoes** — record a name, brand, purchase date, and a retirement threshold (in km, defaults to 700 km); deleting a shoe cascades to its runs.
 - **Log, edit, and delete runs** — attach a date and distance (km) to a specific shoe, with a per-shoe run history view.
-- **Strava import** — connect a Strava account and import your run history (runs, trail runs and treadmill runs), with each run's type, race/ultra labels and start location (looked up on OpenStreetMap). Your history import starts out unassigned. Pick a default shoe and every newly imported run goes to it; move any run to another shoe in one click, and sort out the rest from the "Unassigned runs" list.
+- **Strava import** — connect a Strava account and import your run history (runs, trail runs and treadmill runs), with each run's type, race/ultra labels and start location (looked up on OpenStreetMap). Your history import starts out unassigned. New runs arrive by themselves through Strava's webhook (or the "Import new runs" button). Pick a default shoe and every new run goes to it; move any run to another shoe in one click, and sort out the rest from the "Unassigned runs" list.
 - **Shoe grid / dashboard** — every shoe as an expandable card showing its total accumulated distance and a status of `OK` or `Retire me!` once it crosses its threshold; expanding a card lazily loads its run history.
 - **Automatic mileage totals** — total distance and retirement status are computed server-side from the shoe's logged runs, not stored redundantly.
 - **Input validation** — required fields, positive distances/thresholds, and a rule preventing runs from being logged with a future date.
@@ -53,6 +53,7 @@ The app is a classic two-tier web application: a single-page React frontend that
 | `GET` | `/strava/status` | Whether Strava is available on the server and connected for the current user |
 | `POST` | `/strava/import` | Import the current user's Strava runs (`Run`, `TrailRun`, `VirtualRun`) as unassigned runs; incremental and idempotent |
 | `DELETE` | `/strava/connection` | Disconnect Strava (revokes on Strava's side, best-effort, and deletes the stored tokens) |
+| `GET`/`POST` | `/strava/webhook` | Strava's webhook (called by Strava, no login): subscription validation and new/changed/deleted activity events |
 | `POST` | `/auth/login` | Log in, establishing a cookie session |
 | `POST` | `/auth/logout` | Log out and clear the session |
 | `GET` | `/auth/me` | Get the current logged-in user |
@@ -145,7 +146,7 @@ Leaving `ALLOWED_HOSTS` unset keeps today's behavior (`*`), so it's safe to skip
 
 **3. Strava credentials (optional).**
 
-Set `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` in `.env` from your Strava API app (strava.com/settings/api), whose callback domain must be your domain. The callback URL defaults to `https://milesleft.run/api/strava/callback`; override it with `STRAVA_REDIRECT_URI` for another domain. Without these, the "Connect Strava" option is hidden. Strava tokens are stored encrypted, with keys kept in the `shoe-data` volume (`/data/keys`); the same keys protect the login cookie, so sessions also survive redeploys.
+Set `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` in `.env` from your Strava API app (strava.com/settings/api), whose callback domain must be your domain. The callback URL defaults to `https://milesleft.run/api/strava/callback`; override it with `STRAVA_REDIRECT_URI` for another domain. Without these, the "Connect Strava" option is hidden. On startup the API also subscribes to Strava's webhook at `https://milesleft.run/api/strava/webhook` (override with `STRAVA_WEBHOOK_CALLBACK_URL`, or set it empty to turn it off), so new runs arrive without pressing "Import new runs". Strava allows one subscription per API app; if it already has one for another URL, the API logs a warning and leaves it. Strava tokens are stored encrypted, with keys kept in the `shoe-data` volume (`/data/keys`); the same keys protect the login cookie, so sessions also survive redeploys.
 
 Run locations are looked up on OpenStreetMap's Nominatim service from the API container, so it needs outbound HTTPS access. Only the ~1 km area around each run's start is sent, never the exact start point.
 

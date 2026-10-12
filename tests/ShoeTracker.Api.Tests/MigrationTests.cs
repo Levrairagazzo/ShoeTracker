@@ -45,4 +45,23 @@ public class MigrationTests : IDisposable
         Assert.All(runs, r => Assert.Equal(RunSource.Manual, r.Source));
         Assert.All(runs, r => Assert.Null(r.StravaActivityId));
     }
+
+    [Fact]
+    public void AddStravaHistoryImportedAt_MarksConnectionsWithImportedRunsAsHavingTheirHistory()
+    {
+        _db.GetService<IMigrator>().Migrate("AddDefaultShoe");
+        _db.Database.ExecuteSqlRaw("""
+            INSERT INTO Users (Id, Email, PasswordHash) VALUES (1, 'a@test.dev', 'x'), (2, 'b@test.dev', 'x');
+            INSERT INTO StravaConnections (Id, UserId, AthleteId, AthleteName, EncryptedAccessToken, EncryptedRefreshToken, ExpiresAt, Scope, ConnectedAt)
+                VALUES (1, 1, 11, 'A', 'x', 'x', '2026-09-01 00:00:00+00:00', 'activity:read_all', '2026-09-01 10:00:00+00:00'),
+                       (2, 2, 22, 'B', 'x', 'x', '2026-09-01 00:00:00+00:00', 'activity:read_all', '2026-09-02 10:00:00+00:00');
+            INSERT INTO Runs (Id, UserId, Date, DistanceKm, Source, StravaActivityId, IsRace) VALUES (1, 1, '2026-08-01', 5, 'Strava', 100, 0);
+            """);
+
+        _db.Database.Migrate();
+
+        var connections = _db.StravaConnections.OrderBy(c => c.Id).ToList();
+        Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero), connections[0].HistoryImportedAt);
+        Assert.Null(connections[1].HistoryImportedAt);
+    }
 }

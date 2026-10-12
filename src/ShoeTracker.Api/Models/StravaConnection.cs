@@ -26,4 +26,10 @@ public class StravaConnection
     public string Scope { get; set; } = string.Empty;
 
     public DateTimeOffset ConnectedAt { get; set; }
+
+    /// <summary>
+    /// When the first import after connecting finished, i.e. the user's history is in. Until then
+    /// webhook events are ignored, since a run they added would make the import skip the history.
+    /// </summary>
+    public DateTimeOffset? HistoryImportedAt { get; set; }
 }

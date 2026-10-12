@@ -27,6 +27,8 @@ public abstract class ApiTestBase : IDisposable
     protected const string StravaClientId = "test-client-id";
     protected const string StravaClientSecret = "test-client-secret";
     protected const string StravaRedirectUri = "http://localhost/api/strava/callback";
+    /// <summary>The Strava athlete <see cref="ConnectStravaAsync"/> connects.</summary>
+    public const long StravaAthleteId = 12345;
 
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"shoetracker-test-{Guid.NewGuid()}.db");
     private readonly string _keysPath = Path.Combine(Path.GetTempPath(), $"shoetracker-test-keys-{Guid.NewGuid()}");
@@ -139,7 +141,7 @@ public abstract class ApiTestBase : IDisposable
         await scope.ServiceProvider.GetRequiredService<StravaTokenStore>().SaveAsync(
             userId,
             new StravaTokenResponse(accessToken, "refresh-token", DateTimeOffset.UtcNow.AddHours(6).ToUnixTimeSeconds(),
-                new StravaAthlete(12345, "Test", "Runner")),
+                new StravaAthlete(StravaAthleteId, "Test", "Runner")),
             "read,activity:read_all");
     }
 

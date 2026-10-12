@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ShoeTracker.Api.Data;
@@ -18,6 +19,8 @@ public static class StravaEndpoints
 
     public static void MapStravaEndpoints(this IEndpointRouteBuilder app)
     {
+        MapWebhookEndpoints(app);
+
         var group = app.MapGroup("/strava").RequireAuthorization();
 
         // Full-page navigation from the client, not a fetch: ends with a redirect to Strava.
@@ -137,6 +140,41 @@ public static class StravaEndpoints
 
             await tokens.DeleteAsync(connection);
             return Results.NoContent();
+        });
+    }
+
+    /// <summary>
+    /// Called by Strava, not the browser, so there's no login session: these are the only
+    /// anonymous Strava endpoints. Events are only queued here; see <see cref="StravaWebhookHandler"/>.
+    /// </summary>
+    private static void MapWebhookEndpoints(IEndpointRouteBuilder app)
+    {
+        var webhook = app.MapGroup("/strava/webhook");
+
+        // Strava validates a new subscription by echoing back the verify token it was given.
+        webhook.MapGet("", (
+            [FromQuery(Name = "hub.mode")] string? mode,
+            [FromQuery(Name = "hub.challenge")] string? challenge,
+            [FromQuery(Name = "hub.verify_token")] string? verifyToken,
+            StravaWebhookSubscriber subscriber) =>
+        {
+            if (mode != "subscribe" || challenge is null || verifyToken is null
+                || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(verifyToken), Encoding.UTF8.GetBytes(subscriber.VerifyToken)))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Json(new Dictionary<string, string> { ["hub.challenge"] = challenge });
+        });
+
+        // Strava expects a 200 within 2 seconds, and retries otherwise.
+        webhook.MapPost("", (StravaWebhookEvent webhookEvent, StravaWebhookQueue queue, ILogger<StravaWebhookQueue> logger) =>
+        {
+            if (!queue.TryEnqueue(webhookEvent))
+            {
+                logger.LogWarning("Strava webhook queue is full; dropped an event for activity {ObjectId}.", webhookEvent.ObjectId);
+            }
+            return Results.Ok();
         });
     }
 
