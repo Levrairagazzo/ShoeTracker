@@ -78,8 +78,8 @@ public class AuthEndpointsTests : ApiTestBase
     [InlineData("POST", "/strava/import")]
     [InlineData("DELETE", "/strava/connection")]
     [InlineData("POST", "/shoes/1/runs")]
-    [InlineData("PUT", "/shoes/1/runs/1")]
-    [InlineData("DELETE", "/shoes/1/runs/1")]
+    [InlineData("PUT", "/runs/1")]
+    [InlineData("DELETE", "/runs/1")]
     public async Task ProtectedEndpoint_WithoutSession_Returns401(string method, string path)
     {
         var client = Factory.CreateClient();

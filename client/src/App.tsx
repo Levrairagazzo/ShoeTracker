@@ -5,6 +5,7 @@ import { LoginScreen } from './components/LoginScreen'
 import { Modal } from './components/Modal'
 import { ShoeGrid } from './components/ShoeGrid'
 import { StravaConnection } from './components/StravaConnection'
+import { UnassignedRuns } from './components/UnassignedRuns'
 import { PlusIcon } from './components/icons'
 import { shoeTrackerClient } from './api/shoeTrackerClient'
 import type { CurrentUser, Shoe } from './api/types'
@@ -106,6 +107,10 @@ function App() {
       </header>
 
       <StravaConnection shoes={shoes} onRunsChanged={loadShoes} />
+
+      {/* Outside StravaConnection on purpose: manual runs can be unassigned too, so the list
+          must show even when Strava isn't configured. */}
+      <UnassignedRuns shoes={shoes} onRunsChanged={loadShoes} />
 
       {loading && <SkeletonGrid />}
 

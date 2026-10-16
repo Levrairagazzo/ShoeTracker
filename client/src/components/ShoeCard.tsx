@@ -118,7 +118,7 @@ export function ShoeCard({ shoe, shoes, onChanged }: ShoeCardProps) {
           </button>
           {isConfirmingDelete ? (
             <>
-              <span className="text-xs text-text">Delete this shoe and its runs?</span>
+              <span className="text-xs text-text">Delete this shoe? Its manual runs are deleted; Strava runs become unassigned.</span>
               <button
                 type="button"
                 onClick={handleDelete}

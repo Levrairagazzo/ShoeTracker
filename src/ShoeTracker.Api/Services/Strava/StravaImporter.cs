@@ -9,7 +9,7 @@ namespace ShoeTracker.Api.Services.Strava;
 /// imported (by <see cref="Run.StravaActivityId"/>) are updated in place, not duplicated, and
 /// keep whatever shoe they've been assigned to.
 /// </summary>
-public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTokenStore tokens)
+public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTokenStore tokens, TrainingLog log)
 {
     public const int PageSize = 200;
 
@@ -34,7 +34,7 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
         // The first import after connecting is the user's history, which stays unassigned (E2
         // estimates it); runs arriving after that are new and go to the default shoe, if one is set.
         var isFirstImport = connection.HistoryImportedAt is null;
-        var shoeForNewRuns = isFirstImport ? null : await DefaultShoeAsync(userId, ct);
+        var shoeForNewRuns = isFirstImport ? null : await log.ShoeForNewStravaRunAsync(userId, ct);
 
         var imported = 0;
         for (var page = 1; ; page++)
@@ -95,7 +95,7 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
             result = ActivitySyncResult.Updated;
             if (run is null)
             {
-                run = new Run { UserId = userId, ShoeId = await DefaultShoeAsync(userId, ct), Source = RunSource.Strava, StravaActivityId = activityId };
+                run = new Run { UserId = userId, ShoeId = await log.ShoeForNewStravaRunAsync(userId, ct), Source = RunSource.Strava, StravaActivityId = activityId };
                 db.Runs.Add(run);
                 result = ActivitySyncResult.Added;
             }
@@ -105,9 +105,6 @@ public class StravaImporter(ShoeTrackerContext db, StravaClient strava, StravaTo
         await db.SaveChangesAsync(ct);
         return result;
     }
-
-    private Task<int?> DefaultShoeAsync(int userId, CancellationToken ct) =>
-        db.Users.Where(u => u.Id == userId).Select(u => u.DefaultShoeId).SingleAsync(ct);
 
     /// <summary>
     /// Only ask for activities from the day before the latest imported run. Dates are local to

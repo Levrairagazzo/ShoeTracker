@@ -39,6 +39,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization();
 
+// The training log owns every shoe/run mutation rule; endpoints and the Strava importer call it.
+builder.Services.AddScoped<TrainingLog>();
+
 // Protects the auth cookie and the stored Strava tokens. In Docker the key ring lives on the
 // data volume (DataProtection__KeysPath), so sessions and tokens survive container rebuilds.
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("ShoeTracker");

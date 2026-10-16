@@ -17,7 +17,7 @@ public class RunEndpointsTests : ApiTestBase
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var run = await response.Content.ReadFromJsonAsync<RunResponse>();
-        Assert.Equal($"/shoes/{shoe.Id}/runs/{run!.Id}", response.Headers.Location?.OriginalString);
+        Assert.Equal($"/runs/{run!.Id}", response.Headers.Location?.OriginalString);
         Assert.Equal(new RunResponse(run.Id, new DateOnly(2026, 1, 2), 10.5, shoe.Id, RunSource.Manual, null, false, false, null), run);
     }
 
@@ -49,7 +49,7 @@ public class RunEndpointsTests : ApiTestBase
         var request = new CreateRunRequest(Today.AddDays(daysFromToday), distanceKm);
 
         var create = await client.PostAsJsonAsync($"/shoes/{shoe.Id}/runs", request);
-        var update = await client.PutAsJsonAsync($"/shoes/{shoe.Id}/runs/{existing.Id}", request);
+        var update = await client.PutAsJsonAsync($"/runs/{existing.Id}", request);
 
         Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
         Assert.Equal([field], await ValidationErrorFieldsAsync(create));
@@ -157,7 +157,7 @@ public class RunEndpointsTests : ApiTestBase
         var shoe = await CreateShoeAsync(client);
         var run = await LogRunAsync(client, shoe.Id, 5);
 
-        var response = await client.PutAsJsonAsync($"/shoes/{shoe.Id}/runs/{run.Id}", new CreateRunRequest(new DateOnly(2026, 1, 5), 8));
+        var response = await client.PutAsJsonAsync($"/runs/{run.Id}", new CreateRunRequest(new DateOnly(2026, 1, 5), 8));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(new RunResponse(run.Id, new DateOnly(2026, 1, 5), 8, shoe.Id, RunSource.Manual, null, false, false, null), await response.Content.ReadFromJsonAsync<RunResponse>());
@@ -172,7 +172,7 @@ public class RunEndpointsTests : ApiTestBase
         var kept = await LogRunAsync(client, shoe.Id, 5);
         var deleted = await LogRunAsync(client, shoe.Id, 7);
 
-        var response = await client.DeleteAsync($"/shoes/{shoe.Id}/runs/{deleted.Id}");
+        var response = await client.DeleteAsync($"/runs/{deleted.Id}");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal([kept], await client.GetFromJsonAsync<List<RunResponse>>($"/shoes/{shoe.Id}/runs"));
@@ -180,31 +180,31 @@ public class RunEndpointsTests : ApiTestBase
     }
 
     [Fact]
-    public async Task RunAddressedThroughTheWrongShoe_Returns404AndIsUnchanged()
+    public async Task UnassignedManualRun_CanStillBeEditedAndDeleted()
     {
         var client = await LoginAsync();
         var shoe = await CreateShoeAsync(client);
-        var otherShoe = await CreateShoeAsync(client);
         var run = await LogRunAsync(client, shoe.Id, 5);
+        (await client.PutAsJsonAsync($"/runs/{run.Id}/shoe", new AssignRunRequest(null))).EnsureSuccessStatusCode();
 
-        var update = await client.PutAsJsonAsync($"/shoes/{otherShoe.Id}/runs/{run.Id}", new CreateRunRequest(new DateOnly(2026, 1, 5), 99));
-        var delete = await client.DeleteAsync($"/shoes/{otherShoe.Id}/runs/{run.Id}");
+        var update = await client.PutAsJsonAsync($"/runs/{run.Id}", new CreateRunRequest(new DateOnly(2026, 1, 5), 8));
+        var delete = await client.DeleteAsync($"/runs/{run.Id}");
 
-        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
-        Assert.Equal([run], await client.GetFromJsonAsync<List<RunResponse>>($"/shoes/{shoe.Id}/runs"));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        Assert.Equal(8, (await update.Content.ReadFromJsonAsync<RunResponse>())!.DistanceKm);
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<List<RunResponse>>("/runs"))!);
     }
 
     [Fact]
     public async Task MissingShoeOrRun_Returns404()
     {
         var client = await LoginAsync();
-        var shoe = await CreateShoeAsync(client);
         var request = new CreateRunRequest(new DateOnly(2026, 1, 2), 5);
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/shoes/999/runs")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/shoes/999/runs", request)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync($"/shoes/{shoe.Id}/runs/999", request)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/shoes/{shoe.Id}/runs/999")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync("/runs/999", request)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync("/runs/999")).StatusCode);
     }
 }
