@@ -119,14 +119,14 @@ public class RunAssignmentTests : ApiTestBase
     }
 
     [Fact]
-    public async Task StravaRuns_CantBeEditedOrDeletedThroughTheShoeRoutes()
+    public async Task StravaRuns_CantBeEditedOrDeleted()
     {
         var client = await LoginAsync();
         var shoe = await CreateShoeAsync(client);
         var runId = AddStravaRun(OwnerEmail, 10, shoe.Id);
 
-        var update = await client.PutAsJsonAsync($"/shoes/{shoe.Id}/runs/{runId}", new CreateRunRequest(new DateOnly(2026, 1, 5), 99));
-        var delete = await client.DeleteAsync($"/shoes/{shoe.Id}/runs/{runId}");
+        var update = await client.PutAsJsonAsync($"/runs/{runId}", new CreateRunRequest(new DateOnly(2026, 1, 5), 99));
+        var delete = await client.DeleteAsync($"/runs/{runId}");
 
         Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);

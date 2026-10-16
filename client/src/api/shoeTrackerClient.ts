@@ -49,11 +49,11 @@ export const shoeTrackerClient = {
   logRun: (shoeId: number, body: CreateRunRequest) =>
     request<Run>(`/shoes/${shoeId}/runs`, { method: 'POST', body: JSON.stringify(body) }),
 
-  updateRun: (shoeId: number, id: number, body: CreateRunRequest) =>
-    request<Run>(`/shoes/${shoeId}/runs/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  /** Runs are addressed by their own id: unassigned runs stay editable. Strava runs answer 409. */
+  updateRun: (id: number, body: CreateRunRequest) =>
+    request<Run>(`/runs/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
-  deleteRun: (shoeId: number, id: number) =>
-    request<void>(`/shoes/${shoeId}/runs/${id}`, { method: 'DELETE' }),
+  deleteRun: (id: number) => request<void>(`/runs/${id}`, { method: 'DELETE' }),
 
   login: (body: LoginRequest) =>
     request<CurrentUser>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),

@@ -12,31 +12,10 @@ public static class RunEndpoints
 {
     public static void MapRunEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/shoes/{shoeId:int}/runs", async (int shoeId, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
+        app.MapPost("/shoes/{shoeId:int}/runs", async (int shoeId, CreateRunRequest request, TrainingLog log, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
-            var validation = ValidateRun(request.Date, request.DistanceKm);
-            if (validation is not null) return validation;
-
-            var userId = user.GetUserId();
-            var shoeExists = await db.Shoes.AnyAsync(s => s.Id == shoeId && s.UserId == userId);
-            if (!shoeExists)
-            {
-                return Results.NotFound();
-            }
-
-            var run = new Run
-            {
-                UserId = userId,
-                ShoeId = shoeId,
-                Source = RunSource.Manual,
-                Date = request.Date,
-                DistanceKm = request.DistanceKm
-            };
-
-            db.Runs.Add(run);
-            await db.SaveChangesAsync();
-
-            return Results.Created($"/shoes/{shoeId}/runs/{run.Id}", await ToResponseAsync(run, places));
+            var result = await log.LogRunAsync(user.GetUserId(), shoeId, request.Date, request.DistanceKm);
+            return await result.ToResultAsync<Run>(async run => Results.Created($"/runs/{run.Id}", await ToResponseAsync(run, places)));
         }).RequireAuthorization();
 
         app.MapGet("/shoes/{shoeId:int}/runs", async (int shoeId, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
@@ -87,81 +66,22 @@ public static class RunEndpoints
             return Results.Ok(await ToResponsesAsync(runs, places));
         }).RequireAuthorization();
 
-        app.MapPut("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, CreateRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
+        // A run is addressed by its own id, not through a shoe: an unassigned run stays editable.
+        app.MapPut("/runs/{id:int}", async (int id, CreateRunRequest request, TrainingLog log, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
-            var validation = ValidateRun(request.Date, request.DistanceKm);
-            if (validation is not null) return validation;
-
-            var userId = user.GetUserId();
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.UserId == userId);
-            if (run is null) return Results.NotFound();
-            if (run.Source == RunSource.Strava) return StravaRunIsReadOnly();
-
-            run.Date = request.Date;
-            run.DistanceKm = request.DistanceKm;
-
-            await db.SaveChangesAsync();
-
-            return Results.Ok(await ToResponseAsync(run, places));
+            var result = await log.EditRunAsync(user.GetUserId(), id, request.Date, request.DistanceKm);
+            return await result.ToResultAsync<Run>(async run => Results.Ok(await ToResponseAsync(run, places)));
         }).RequireAuthorization();
 
-        app.MapDelete("/shoes/{shoeId:int}/runs/{id:int}", async (int shoeId, int id, ShoeTrackerContext db, ClaimsPrincipal user) =>
-        {
-            var userId = user.GetUserId();
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.ShoeId == shoeId && r.UserId == userId);
-            if (run is null) return Results.NotFound();
-            if (run.Source == RunSource.Strava) return StravaRunIsReadOnly();
-
-            db.Runs.Remove(run);
-            await db.SaveChangesAsync();
-
-            return Results.NoContent();
-        }).RequireAuthorization();
+        app.MapDelete("/runs/{id:int}", async (int id, TrainingLog log, ClaimsPrincipal user) =>
+            (await log.DeleteRunAsync(user.GetUserId(), id)).ToResult(Results.NoContent())).RequireAuthorization();
 
         // Moves any of the user's runs (manual or Strava) to another shoe, or unassigns it.
-        app.MapPut("/runs/{id:int}/shoe", async (int id, AssignRunRequest request, ShoeTrackerContext db, ClaimsPrincipal user, PlaceNameResolver places) =>
+        app.MapPut("/runs/{id:int}/shoe", async (int id, AssignRunRequest request, TrainingLog log, ClaimsPrincipal user, PlaceNameResolver places) =>
         {
-            var userId = user.GetUserId();
-            var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
-            if (run is null) return Results.NotFound();
-
-            if (request.ShoeId is { } shoeId && !await db.Shoes.AnyAsync(s => s.Id == shoeId && s.UserId == userId))
-            {
-                return Results.NotFound();
-            }
-
-            run.ShoeId = request.ShoeId;
-            await db.SaveChangesAsync();
-
-            return Results.Ok(await ToResponseAsync(run, places));
+            var result = await log.MoveRunAsync(user.GetUserId(), id, request.ShoeId);
+            return await result.ToResultAsync<Run>(async run => Results.Ok(await ToResponseAsync(run, places)));
         }).RequireAuthorization();
-    }
-
-    // Strava is the source of truth for its runs: a local edit would be overwritten by the next
-    // import, and a local delete undone by it. Only the shoe can change (PUT /runs/{id}/shoe).
-    private static IResult StravaRunIsReadOnly() => Results.Problem(
-        "Runs imported from Strava can't be edited or deleted here. Change them on Strava, or move them to another shoe.",
-        statusCode: StatusCodes.Status409Conflict);
-
-    private static IResult? ValidateRun(DateOnly date, double distanceKm)
-    {
-        if (distanceKm <= 0)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["DistanceKm"] = ["DistanceKm must be greater than zero."]
-            });
-        }
-
-        if (date > DateOnly.FromDateTime(DateTime.UtcNow))
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["Date"] = ["Date cannot be in the future."]
-            });
-        }
-
-        return null;
     }
 
     private static async Task<RunResponse> ToResponseAsync(Run run, PlaceNameResolver places) =>

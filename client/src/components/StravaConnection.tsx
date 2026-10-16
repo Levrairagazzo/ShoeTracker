@@ -4,7 +4,6 @@ import type { Run, Shoe, StravaStatus } from '../api/types'
 import { StravaRunTable } from './StravaRunTable'
 
 const LATEST_RUNS_SHOWN = 10
-const UNASSIGNED_PAGE = 20
 
 interface StravaConnectionProps {
   shoes: Shoe[]
@@ -44,8 +43,6 @@ function pluralRuns(count: number) {
 export function StravaConnection({ shoes, onRunsChanged }: StravaConnectionProps) {
   const [status, setStatus] = useState<StravaStatus | null>(null)
   const [latestRuns, setLatestRuns] = useState<Run[]>([])
-  const [unassignedRuns, setUnassignedRuns] = useState<Run[]>([])
-  const [unassignedShown, setUnassignedShown] = useState(UNASSIGNED_PAGE)
   const [result] = useState(takeResultFromUrl)
   const [notice, setNotice] = useState<Notice | null>(result ? (RESULT_NOTICES[result] ?? RESULT_NOTICES.error) : null)
   const [busy, setBusy] = useState(false)
@@ -55,8 +52,7 @@ export function StravaConnection({ shoes, onRunsChanged }: StravaConnectionProps
     const next = await shoeTrackerClient.stravaStatus()
     setStatus(next)
     setLatestRuns(next.importedRuns > 0 ? await shoeTrackerClient.latestStravaRuns(LATEST_RUNS_SHOWN) : [])
-    setUnassignedRuns(next.unassignedRuns > 0 ? await shoeTrackerClient.unassignedRuns(unassignedShown) : [])
-  }, [unassignedShown])
+  }, [])
 
   const runImport = useCallback(
     async (prefix: string) => {
@@ -190,31 +186,6 @@ export function StravaConnection({ shoes, onRunsChanged }: StravaConnectionProps
             ))}
           </select>
         </label>
-      )}
-
-      {status && status.unassignedRuns > 0 && (
-        <details className="max-w-3xl text-sm">
-          <summary className="cursor-pointer font-medium text-text-h">
-            Unassigned runs ({status.unassignedRuns})
-          </summary>
-          <StravaRunTable
-            runs={unassignedRuns}
-            shoes={shoes}
-            onMoved={() => {
-              refreshStatus().catch(() => {})
-              onRunsChanged()
-            }}
-          />
-          {unassignedRuns.length < status.unassignedRuns && (
-            <button
-              type="button"
-              onClick={() => setUnassignedShown((n) => n + UNASSIGNED_PAGE)}
-              className="mt-2 rounded-full px-3 py-1 font-medium text-accent hover:bg-accent-bg"
-            >
-              Show more
-            </button>
-          )}
-        </details>
       )}
 
       {latestRuns.length > 0 && (

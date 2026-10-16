@@ -47,8 +47,8 @@ public class UserScopingTests : ApiTestBase
 
         Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/shoes/{shoe.Id}/runs")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.PostAsJsonAsync($"/shoes/{shoe.Id}/runs", runRequest)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await other.PutAsJsonAsync($"/shoes/{shoe.Id}/runs/{run.Id}", runRequest with { DistanceKm = 99 })).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await other.DeleteAsync($"/shoes/{shoe.Id}/runs/{run.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PutAsJsonAsync($"/runs/{run.Id}", runRequest with { DistanceKm = 99 })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.DeleteAsync($"/runs/{run.Id}")).StatusCode);
 
         var runs = await owner.GetFromJsonAsync<List<RunResponse>>($"/shoes/{shoe.Id}/runs");
         Assert.Equal(10, Assert.Single(runs!).DistanceKm);

@@ -44,7 +44,7 @@ function RunRow({ shoeId, shoes, run, onChanged, onUpdated, onDeleted }: RunRowP
     setError(null)
     setSubmitting(true)
     try {
-      const updated = await shoeTrackerClient.updateRun(shoeId, run.id, {
+      const updated = await shoeTrackerClient.updateRun(run.id, {
         date,
         distanceKm: Number(distanceKm),
       })
@@ -68,7 +68,7 @@ function RunRow({ shoeId, shoes, run, onChanged, onUpdated, onDeleted }: RunRowP
   async function handleDelete() {
     setSubmitting(true)
     try {
-      await shoeTrackerClient.deleteRun(shoeId, run.id)
+      await shoeTrackerClient.deleteRun(run.id)
       onDeleted()
       onChanged()
     } finally {
